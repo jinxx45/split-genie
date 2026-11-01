@@ -14,5 +14,6 @@ __pycache__/
 .vscode/
 .idea/
 
-# Receipt photos saved by the app
+# Receipt photos and splits saved by the app
 uploads/
+*.db

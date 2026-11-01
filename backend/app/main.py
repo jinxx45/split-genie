@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import FastAPI, Request
 
+from app.api import splits
 from app.observability import configure_logging, elapsed_ms, enable_langsmith_if_configured, log_event
 
 configure_logging()
@@ -12,6 +13,7 @@ enable_langsmith_if_configured()
 api_log = logging.getLogger("split_genie.api")
 
 app = FastAPI(title="Split Genie API")
+app.include_router(splits.router)
 
 
 @app.middleware("http")
