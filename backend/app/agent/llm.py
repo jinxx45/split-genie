@@ -209,12 +209,7 @@ and the full list of people who had it after the change (not just the people who
 
 def gemini() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        api_key=settings.gemini_api_key,
-        temperature=0,
-        # How much hidden reasoning the model does before answering. Reading a receipt and
-        # applying a note need little, and each level up adds seconds to every call.
-        thinking_level=settings.gemini_thinking_level,
+        model=settings.gemini_model, api_key=settings.gemini_api_key, temperature=0
     )
 
 
