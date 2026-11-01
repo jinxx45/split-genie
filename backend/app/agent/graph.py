@@ -30,7 +30,7 @@ from app.agent.receipt import (
 )
 from app.money.settle import settle
 from app.observability import AgentLogHandler
-from app.money.split import Bill, Item, balances, compute_shares
+from app.money.split import Bill, Item, balances, compute_breakdown
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
 MIN_NOTE_WORDS = 2  # "wrong" alone can't be acted on; "Priya brownie" can
@@ -65,11 +65,13 @@ class SplitState(TypedDict):
     paid: dict[str, int]  # who paid the current receipt, in paise
     finished: list[FinishedReceipt]
     shares: dict[str, int]
+    breakdown: dict[str, dict]  # person -> their items, charges and total, for the approval screen
     balances: dict[str, int]
     payments: list[dict]
     approved: bool
     correction_note: str  # why the user rejected the split
     approval_error: str | None  # shown on the approval screen when an answer couldn't be used
+    last_changes: list[dict]  # what the last correction changed, shown on the approval screen
 
 
 def new_split(people: list[str], note: str, receipt_ids: list[str]) -> SplitState:
@@ -86,11 +88,13 @@ def new_split(people: list[str], note: str, receipt_ids: list[str]) -> SplitStat
         "paid": {},
         "finished": [],
         "shares": {},
+        "breakdown": {},
         "balances": {},
         "payments": [],
         "approved": False,
         "correction_note": "",
         "approval_error": None,
+        "last_changes": [],
     }
 
 
@@ -195,25 +199,24 @@ def finish_receipt(state: SplitState) -> dict:
 
 
 def compute_shares_node(state: SplitState) -> dict:
-    """Plain Python from here on: the LLM never does money maths."""
-    owed: dict[str, int] = {}
+    """Plain Python from here on: the LLM never does money maths.
+
+    Builds each person's breakdown across all receipts; their share is its total, so the
+    numbers on the approval screen always add up.
+    """
+    breakdown: dict[str, dict] = {}
     paid: dict[str, int] = {}
     for done in state["finished"]:
-        receipt = done["receipt"]
-        bill = Bill(
-            items=[
-                Item(item["name"], item["amount_paise"], weights)
-                for item, weights in zip(receipt["items"], done["assignments"])
-            ],
-            tax_paise=receipt["tax_paise"],
-            service_charge_paise=receipt["service_charge_paise"],
-        )
-        for person, amount in compute_shares(bill).items():
-            owed[person] = owed.get(person, 0) + amount
+        for person, part in compute_breakdown(to_bill(done)).items():
+            entry = breakdown.setdefault(person, {"items": [], "charges_paise": 0, "total_paise": 0})
+            entry["items"].extend(asdict(share) for share in part.items)
+            entry["charges_paise"] += part.charges_paise
+            entry["total_paise"] += part.total_paise
         for person, amount in done["paid"].items():
             paid[person] = paid.get(person, 0) + amount
 
-    return {"shares": owed, "balances": balances(owed, paid)}
+    owed = {person: entry["total_paise"] for person, entry in breakdown.items()}
+    return {"shares": owed, "breakdown": breakdown, "balances": balances(owed, paid)}
 
 
 def settle_node(state: SplitState) -> dict:
@@ -226,7 +229,9 @@ def approve_split(state: SplitState) -> dict:
         {
             "step": "approve",
             "shares": state["shares"],
+            "breakdown": state["breakdown"],
             "payments": state["payments"],
+            "changes": state["last_changes"],
             "error": state["approval_error"],
         }
     )
@@ -237,6 +242,7 @@ def approve_split(state: SplitState) -> dict:
         "approved": answer["approved"],
         "correction_note": (answer.get("note") or "").strip(),
         "approval_error": None,
+        "last_changes": [],
     }
 
 
@@ -256,9 +262,18 @@ def apply_correction(state: SplitState, correct_assignments: CorrectAssignments)
 
     # Copy before changing: nodes return new values instead of editing the state in place.
     finished = [dict(done, assignments=list(done["assignments"])) for done in state["finished"]]
+    changes = []
     for correction in corrections:
-        finished[correction["receipt"]]["assignments"][correction["item"]] = correction["weights"]
-    return {"finished": finished, "approval_error": None}
+        done = finished[correction["receipt"]]
+        changes.append(
+            {
+                "item": done["receipt"]["items"][correction["item"]]["name"],
+                "before": done["assignments"][correction["item"]],
+                "after": correction["weights"],
+            }
+        )
+        done["assignments"][correction["item"]] = correction["weights"]
+    return {"finished": finished, "approval_error": None, "last_changes": changes}
 
 
 # --- Plain helpers ---
@@ -283,6 +298,19 @@ def check_approval(answer: object) -> str | None:
     if len(note) > MAX_NOTE_LENGTH:
         return f"Please keep the note under {MAX_NOTE_LENGTH} characters."
     return None
+
+
+def to_bill(done: FinishedReceipt) -> Bill:
+    """A finished receipt in the shape the money code works with."""
+    receipt = done["receipt"]
+    return Bill(
+        items=[
+            Item(item["name"], item["amount_paise"], weights)
+            for item, weights in zip(receipt["items"], done["assignments"])
+        ],
+        tax_paise=receipt["tax_paise"],
+        service_charge_paise=receipt["service_charge_paise"],
+    )
 
 
 def assigned_items(finished: list[FinishedReceipt]) -> list[AssignedItem]:

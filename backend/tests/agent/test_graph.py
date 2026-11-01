@@ -249,3 +249,30 @@ def test_bad_answers_are_rejected_before_the_ai_is_called():
         question = paused_at(graph, config)
         assert question["step"] == "approve"
         assert expected_error in question["error"], bad_answer
+
+
+def test_approval_shows_how_each_persons_total_is_made_up():
+    graph, config = run_dinner_to_approval()
+
+    question = paused_at(graph, config)
+
+    priya = question["breakdown"]["priya"]
+    assert [share["item"] for share in priya["items"]] == ["Chicken Biryani", "Gulab Jamun"]
+    assert priya["items"][0] == {"item": "Chicken Biryani", "amount_paise": 20000, "shared_by": 3, "half": False}
+    for person, part in question["breakdown"].items():
+        assert part["total_paise"] == question["shares"][person]
+    assert question["changes"] == []  # nothing corrected yet
+
+
+def test_approval_after_a_correction_lists_what_changed():
+    graph, config = run_dinner_to_approval()
+
+    answer(graph, config, {"approved": False, "note": "Priya didn't have dessert"})
+
+    assert paused_at(graph, config)["changes"] == [
+        {
+            "item": "Gulab Jamun",
+            "before": {"arun": FULL, "priya": FULL, "ravi": FULL},
+            "after": {"arun": FULL, "ravi": FULL},
+        }
+    ]

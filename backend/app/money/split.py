@@ -21,6 +21,28 @@ class Bill:
     service_charge_paise: int = 0
 
 
+@dataclass
+class ItemShare:
+    """One person's part of one item."""
+
+    item: str
+    amount_paise: int
+    shared_by: int  # how many people had the item
+    half: bool  # whether this person had a half share
+
+
+@dataclass
+class PersonBreakdown:
+    """How one person's total is made up."""
+
+    items: list[ItemShare]
+    charges_paise: int  # their part of tax and service charge, in proportion to what they had
+
+    @property
+    def total_paise(self) -> int:
+        return sum(share.amount_paise for share in self.items) + self.charges_paise
+
+
 def allocate(total: int, weights: dict[str, int]) -> dict[str, int]:
     """Split `total` paise in proportion to `weights`, summing exactly to `total`.
 
@@ -36,19 +58,38 @@ def allocate(total: int, weights: dict[str, int]) -> dict[str, int]:
     return shares
 
 
-def compute_shares(bill: Bill) -> dict[str, int]:
-    """What each person owes in total, in paise.
+def compute_breakdown(bill: Bill) -> dict[str, PersonBreakdown]:
+    """Each person's part of every item they had, plus their part of the charges.
 
     Items are split by weight; tax and service charge are split in proportion
-    to what each person ate.
+    to what each person had.
     """
-    subtotals: dict[str, int] = {}
+    items_by_person: dict[str, list[ItemShare]] = {}
     for item in bill.items:
         for person, amount in allocate(item.amount_paise, item.weights).items():
-            subtotals[person] = subtotals.get(person, 0) + amount
+            share = ItemShare(
+                item=item.name,
+                amount_paise=amount,
+                shared_by=len(item.weights),
+                half=item.weights[person] == HALF,
+            )
+            items_by_person.setdefault(person, []).append(share)
 
+    subtotals = {
+        person: sum(share.amount_paise for share in shares)
+        for person, shares in items_by_person.items()
+    }
     charges = allocate(bill.tax_paise + bill.service_charge_paise, subtotals)
-    return {person: subtotals[person] + charges[person] for person in subtotals}
+    return {
+        person: PersonBreakdown(items=shares, charges_paise=charges[person])
+        for person, shares in items_by_person.items()
+    }
+
+
+def compute_shares(bill: Bill) -> dict[str, int]:
+    """What each person owes in total, in paise. Taken from the breakdown, so the totals
+    and the breakdown shown to users can never disagree."""
+    return {person: part.total_paise for person, part in compute_breakdown(bill).items()}
 
 
 def balances(owed: dict[str, int], paid: dict[str, int]) -> dict[str, int]:

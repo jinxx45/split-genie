@@ -1,4 +1,14 @@
-from app.money.split import FULL, HALF, Bill, Item, allocate, balances, compute_shares
+from app.money.split import (
+    FULL,
+    HALF,
+    Bill,
+    Item,
+    ItemShare,
+    allocate,
+    balances,
+    compute_breakdown,
+    compute_shares,
+)
 
 
 def test_allocate_splits_evenly_when_possible():
@@ -73,3 +83,36 @@ def test_balances_positive_means_owed_money():
     paid = {"arun": 100000}
 
     assert balances(owed, paid) == {"arun": 30000, "ravi": -30000}
+
+
+def test_breakdown_lists_each_persons_part_of_each_item():
+    bill = Bill(
+        items=[
+            Item("Biryani", 60000, {"arun": FULL, "ravi": FULL, "priya": HALF}),
+            Item("Kingfisher", 40000, {"arun": FULL}),
+        ],
+        tax_paise=5000,
+    )
+
+    breakdown = compute_breakdown(bill)
+
+    priya = breakdown["priya"]
+    assert priya.items == [ItemShare(item="Biryani", amount_paise=12000, shared_by=3, half=True)]
+    assert [share.item for share in breakdown["arun"].items] == ["Biryani", "Kingfisher"]
+    assert priya.total_paise == 12000 + priya.charges_paise
+
+
+def test_breakdown_totals_are_the_shares_and_add_up_to_the_bill():
+    bill = Bill(
+        items=[
+            Item("Paneer Tikka", 33333, {"a": FULL, "b": FULL, "c": HALF}),
+            Item("Naan", 9999, {"a": FULL, "c": FULL}),
+        ],
+        tax_paise=2777,
+        service_charge_paise=5555,
+    )
+
+    breakdown = compute_breakdown(bill)
+
+    assert {person: part.total_paise for person, part in breakdown.items()} == compute_shares(bill)
+    assert sum(part.total_paise for part in breakdown.values()) == 33333 + 9999 + 2777 + 5555

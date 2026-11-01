@@ -130,9 +130,24 @@ def ask_payer(question: dict, people: list[str]) -> dict:
 
 
 def ask_approval(question: dict) -> dict:
-    print("\n── Final split ──")
-    for person, amount in question["shares"].items():
-        print(f"  {person:<16} owes in total {format_rupees(amount):>11}")
+    if question["changes"]:
+        print("\n── Changes from your note ──")
+        for change in question["changes"]:
+            before = llm.describe_people(change["before"])
+            after = llm.describe_people(change["after"])
+            print(f"  {change['item']}: {before}  →  {after}")
+
+    print("\n── How the bill was split ──")
+    for person, part in question["breakdown"].items():
+        print(f"  {person:<38} {format_rupees(part['total_paise']):>11}")
+        for share in part["items"]:
+            who = f"just {person}" if share["shared_by"] == 1 else f"shared by {share['shared_by']}"
+            if share["half"]:
+                who += ", half share"
+            print(f"      {share['item']:<30} {who:<22} {format_rupees(share['amount_paise']):>10}")
+        print(f"      {'Tax and charges':<53} {format_rupees(part['charges_paise']):>10}")
+
+    print("\n── Payments ──")
     for payment in question["payments"]:
         print(f"  {payment['sender']} → {payment['receiver']}  {format_rupees(payment['amount_paise'])}")
     if question["error"]:
