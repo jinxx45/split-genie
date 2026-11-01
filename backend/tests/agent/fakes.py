@@ -1,6 +1,6 @@
-"""Stand-ins for the two AI steps, so graph tests run without Gemini or an API key."""
+"""Stand-ins for the AI steps, so graph tests run without Gemini or an API key."""
 
-from app.agent.receipt import LineItem, Receipt, Suggestion
+from app.agent.receipt import AssignedItem, Correction, LineItem, Receipt, Suggestion
 from app.money.split import FULL
 
 DINNER: Receipt = {
@@ -54,3 +54,16 @@ def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> 
         else:
             suggestions.append({"weights": {p: FULL for p in people}, "reason": "Shared"})
     return suggestions
+
+
+def correct_assignments(people: list[str], items: list[AssignedItem], note: str) -> list[Correction]:
+    """Understands one kind of note: "<name> didn't have dessert". Anything else: no changes."""
+    if "dessert" not in note.lower():
+        return []
+    named = [person for person in people if person.lower() in note.lower()]
+    corrections: list[Correction] = []
+    for item in items:
+        if "Jamun" in item["name"]:
+            weights = {p: w for p, w in item["weights"].items() if p not in named}
+            corrections.append({"receipt": item["receipt"], "item": item["item"], "weights": weights})
+    return corrections

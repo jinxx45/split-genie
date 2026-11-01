@@ -3,12 +3,15 @@
 from app.agent import llm
 from app.agent.llm import (
     AssignmentSuggestions,
+    CorrectionChanges,
+    ItemChange,
     ItemSuggestion,
     PersonShare,
     ReadCharge,
     ReadLine,
     ReceiptReading,
     reading_to_receipt,
+    to_corrections,
     to_suggestions,
 )
 from app.agent.receipt import totals_match
@@ -128,3 +131,49 @@ def test_suggest_assignments_never_sends_prices(monkeypatch):
 
     assert "Kingfisher x2 (alcohol)" in fake.sent
     assert "400" not in fake.sent
+
+
+ASSIGNED = [
+    {"receipt": 0, "item": 0, "name": "Chicken Biryani", "weights": {"Arun": FULL, "Priya": FULL}},
+    {"receipt": 0, "item": 1, "name": "Gulab Jamun", "weights": {"Arun": FULL, "Priya": FULL}},
+]
+
+
+def change(receipt, item, *shares):
+    return ItemChange(
+        receipt=receipt,
+        item=item,
+        people=[PersonShare(name=name, share=share) for name, share in shares],
+    )
+
+
+def test_corrections_keep_valid_changes():
+    answer = CorrectionChanges(changes=[change(0, 1, ("arun", "full"))])
+
+    assert to_corrections(answer, PEOPLE, ASSIGNED) == [
+        {"receipt": 0, "item": 1, "weights": {"Arun": FULL}}
+    ]
+
+
+def test_corrections_drop_unknown_items_unknown_names_and_empty_items():
+    answer = CorrectionChanges(
+        changes=[
+            change(0, 7, ("Arun", "full")),  # no item 7
+            change(3, 0, ("Arun", "full")),  # no receipt 3
+            change(0, 0, ("Rahul", "full")),  # not in this split
+            change(0, 1),  # would leave the item with nobody
+        ]
+    )
+
+    assert to_corrections(answer, PEOPLE, ASSIGNED) == []
+
+
+def test_correct_assignments_lists_items_with_ids_and_people_but_no_prices(monkeypatch):
+    fake = FakeGemini(CorrectionChanges(changes=[]))
+    monkeypatch.setattr(llm, "gemini", lambda: fake)
+    items = [{"receipt": 0, "item": 1, "name": "Gulab Jamun", "weights": {"Arun": FULL, "Priya": HALF}}]
+
+    llm.correct_assignments(PEOPLE, items, "Priya didn't have dessert")
+
+    assert "0.1 Gulab Jamun: Arun, Priya (half)" in fake.sent
+    assert "Priya didn't have dessert" in fake.sent

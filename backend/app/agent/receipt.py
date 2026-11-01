@@ -29,6 +29,23 @@ class Suggestion(TypedDict):
     reason: str  # shown to the user on the review screen
 
 
+class AssignedItem(TypedDict):
+    """An item from a finished receipt and who had it, as shown when correcting the split."""
+
+    receipt: int  # index of the receipt in the split
+    item: int  # index of the item on that receipt
+    name: str
+    weights: dict[str, int]
+
+
+class Correction(TypedDict):
+    """A fix to one item: the new list of who had it."""
+
+    receipt: int
+    item: int
+    weights: dict[str, int]  # never empty: every item must have someone
+
+
 def receipt_total(receipt: Receipt) -> int:
     """What the receipt adds up to from its lines."""
     items = sum(item["amount_paise"] for item in receipt["items"])

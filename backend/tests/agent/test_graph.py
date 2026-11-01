@@ -10,8 +10,13 @@ PEOPLE = ["arun", "priya", "ravi"]
 NOTE = "Not everyone drank"
 
 
-def make_graph(checkpointer=None, read_receipt=fakes.read_receipt, suggest=fakes.suggest_assignments):
-    return build_graph(checkpointer or InMemorySaver(), read_receipt, suggest)
+def make_graph(
+    checkpointer=None,
+    read_receipt=fakes.read_receipt,
+    suggest=fakes.suggest_assignments,
+    correct=fakes.correct_assignments,
+):
+    return build_graph(checkpointer or InMemorySaver(), read_receipt, suggest, correct)
 
 
 def start(receipt_ids, note=NOTE, **graph_options):
@@ -173,3 +178,73 @@ def test_split_resumes_from_a_new_graph_using_the_same_checkpointer():
     assert paused_at(later, config)["step"] == "confirm_items"
     answer(later, config, LUNCH)
     assert paused_at(later, config)["step"] == "review_assignments"
+
+
+# --- Final approval ---
+
+
+def run_dinner_to_approval(**graph_options):
+    """Dinner for three, Arun and Ravi had the beer, Priya paid. Stops at the approval screen."""
+    graph, config = start(["dinner"], **graph_options)
+    answer(graph, config, DINNER)
+    answer(graph, config, {"changes": {"1": {"arun": FULL, "ravi": FULL}}})
+    answer(graph, config, {"priya": 123200})
+    return graph, config
+
+
+def test_approving_ends_the_split():
+    graph, config = run_dinner_to_approval()
+    question = paused_at(graph, config)
+    assert question["step"] == "approve"
+    assert question["error"] is None
+
+    answer(graph, config, {"approved": True})
+
+    assert graph.get_state(config).next == ()  # finished
+
+
+def test_rejecting_with_a_note_fixes_the_split_and_asks_again():
+    graph, config = run_dinner_to_approval()
+
+    answer(graph, config, {"approved": False, "note": "Priya didn't have dessert"})
+
+    question = paused_at(graph, config)
+    assert question["step"] == "approve"
+    assert question["error"] is None
+    # Priya no longer pays for a third of the ₹120 Gulab Jamun or its share of the charges
+    assert question["shares"]["priya"] == 22000
+    assert sum(question["shares"].values()) == 123200
+
+
+def test_a_note_that_matches_nothing_is_asked_again_with_a_hint():
+    graph, config = run_dinner_to_approval()
+
+    answer(graph, config, {"approved": False, "note": "asdf qwerty zxcv"})
+
+    question = paused_at(graph, config)
+    assert question["step"] == "approve"
+    assert "Couldn't match that" in question["error"]
+    assert question["shares"]["priya"] == 26400  # unchanged
+
+
+def test_bad_answers_are_rejected_before_the_ai_is_called():
+    def must_not_be_called(people, items, note):
+        raise AssertionError("invalid answers must not reach the AI")
+
+    graph, config = run_dinner_to_approval(correct=must_not_be_called)
+
+    for bad_answer, expected_error in [
+        ("yes", "Please approve the split"),
+        ({"approved": "yes"}, "Please approve the split"),
+        ({"approved": True, "note": "looks good"}, "only needed when something is wrong"),
+        ({"approved": False}, "Please say what's wrong"),
+        ({"approved": False, "note": "   "}, "Please say what's wrong"),
+        ({"approved": False, "note": "wrong!!"}, "Please say what's wrong"),
+        ({"approved": False, "note": "??? !!! 123"}, "Please say what's wrong"),
+        ({"approved": False, "note": 42}, "must be text"),
+        ({"approved": False, "note": "word " * 200}, "under 500 characters"),
+    ]:
+        answer(graph, config, bad_answer)
+        question = paused_at(graph, config)
+        assert question["step"] == "approve"
+        assert expected_error in question["error"], bad_answer

@@ -1,4 +1,5 @@
-"""The two AI steps, done with Gemini: reading a receipt photo, and suggesting who had what.
+"""The AI steps, done with Gemini: reading a receipt photo, suggesting who had what, and
+turning the user's correction note into specific changes.
 
 Gemini fills in the Pydantic models below. Everything after that (turning "₹1,232.00" into
 paise, adding up, checking names) is plain Python, so it can be tested without the AI.
@@ -12,7 +13,15 @@ from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
-from app.agent.receipt import Category, LineItem, Receipt, Suggestion, to_paise
+from app.agent.receipt import (
+    AssignedItem,
+    Category,
+    Correction,
+    LineItem,
+    Receipt,
+    Suggestion,
+    to_paise,
+)
 from app.config import settings
 from app.money.split import FULL, HALF
 
@@ -50,6 +59,16 @@ class ItemSuggestion(BaseModel):
 
 class AssignmentSuggestions(BaseModel):
     items: list[ItemSuggestion]
+
+
+class ItemChange(BaseModel):
+    receipt: int = Field(description="The receipt number, the first number of the item's id")
+    item: int = Field(description="The item number, the second number of the item's id")
+    people: list[PersonShare] = Field(description="Everyone who had the item after the fix")
+
+
+class CorrectionChanges(BaseModel):
+    changes: list[ItemChange] = Field(description="Empty if the note doesn't clearly ask for a change")
 
 
 # --- Turning Gemini's answers into our own types. Pure functions, tested without the AI. ---
@@ -111,6 +130,31 @@ def to_suggestions(
     return suggestions
 
 
+def to_corrections(
+    answer: CorrectionChanges, people: list[str], items: list[AssignedItem]
+) -> list[Correction]:
+    """Keep only changes that point at a real item and leave it with real people."""
+    people_by_lowercase = {person.lower(): person for person in people}
+    known_items = {(item["receipt"], item["item"]) for item in items}
+
+    corrections: list[Correction] = []
+    for change in answer.changes:
+        if (change.receipt, change.item) not in known_items:
+            continue
+
+        weights = {}
+        for share in change.people:
+            person = people_by_lowercase.get(share.name.strip().lower())
+            if person is None:
+                weights = {}
+                break
+            weights[person] = FULL if share.share == "full" else HALF
+
+        if weights:  # an item can't be left with nobody
+            corrections.append({"receipt": change.receipt, "item": change.item, "weights": weights})
+    return corrections
+
+
 # --- Calling Gemini ---
 
 READ_PROMPT = """You are reading a photo of a restaurant or shop bill from India.
@@ -148,6 +192,21 @@ Return one entry per item, using the item's number as its index, with a short re
 written for the user."""
 
 
+CORRECT_PROMPT = """People splitting a bill: {people}
+
+Items, with who had each one:
+{items}
+
+The user rejected the split with this note: "{note}"
+
+Return the changes the note asks for. For each changed item, give its receipt and item numbers
+and the full list of people who had it after the change (not just the people who changed).
+- Only change items the note clearly refers to.
+- Only use names from the list of people.
+- If the note is unclear, unrelated to who had which item, or not a real sentence, return no
+  changes."""
+
+
 def gemini() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
         model=settings.gemini_model, api_key=settings.gemini_api_key, temperature=0
@@ -178,3 +237,20 @@ def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> 
     prompt = ASSIGN_PROMPT.format(people=", ".join(people), note=note, items=numbered_items)
     answer = gemini().with_structured_output(AssignmentSuggestions).invoke(prompt)
     return to_suggestions(answer, people, len(items))
+
+
+def correct_assignments(
+    people: list[str], items: list[AssignedItem], note: str
+) -> list[Correction]:
+    listed_items = "\n".join(
+        f"{item['receipt']}.{item['item']} {item['name']}: {describe_people(item['weights'])}"
+        for item in items
+    )
+    prompt = CORRECT_PROMPT.format(people=", ".join(people), items=listed_items, note=note)
+    answer = gemini().with_structured_output(CorrectionChanges).invoke(prompt)
+    return to_corrections(answer, people, items)
+
+
+def describe_people(weights: dict[str, int]) -> str:
+    """{"Arun": FULL, "Priya": HALF} -> "Arun, Priya (half)"."""
+    return ", ".join(name if weight == FULL else f"{name} (half)" for name, weight in weights.items())
