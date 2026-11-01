@@ -7,10 +7,14 @@ PEOPLE = ["Arun", "Priya", "Ravi"]
 
 
 def test_parse_people_with_half_shares_and_any_case():
-    assert parse_people("arun, Priya* ", PEOPLE) == {"Arun": FULL, "Priya": HALF}
+    assert parse_people("arun, Priya* ", PEOPLE) == {"weights": {"Arun": FULL, "Priya": HALF}, "by_count": False}
 
 
-@pytest.mark.parametrize("answer", ["", "Rahul", "Arun,,Priya"])
+def test_parse_people_with_counts():
+    assert parse_people("Arun=2, priya=1", PEOPLE) == {"weights": {"Arun": 2, "Priya": 1}, "by_count": True}
+
+
+@pytest.mark.parametrize("answer", ["", "Rahul", "Arun,,Priya", "Arun=0", "Arun=1, Priya"])
 def test_parse_people_rejects_unknown_or_empty_names(answer):
     with pytest.raises(ValueError):
         parse_people(answer, PEOPLE)

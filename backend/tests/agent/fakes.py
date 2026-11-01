@@ -6,9 +6,9 @@ from app.money.split import FULL
 DINNER: Receipt = {
     "place": "Hotel Saravana",
     "items": [
-        {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food"},
-        {"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol"},
-        {"name": "Gulab Jamun", "amount_paise": 12000, "category": "dessert"},
+        {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food", "quantity": 1},
+        {"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol", "quantity": 2},
+        {"name": "Gulab Jamun", "amount_paise": 12000, "category": "dessert", "quantity": 1},
     ],
     "tax_paise": 5600,
     "service_charge_paise": 5600,
@@ -18,8 +18,8 @@ DINNER: Receipt = {
 LUNCH: Receipt = {
     "place": "Murugan Idli Shop",
     "items": [
-        {"name": "Meals", "amount_paise": 36000, "category": "food"},
-        {"name": "Filter Coffee x3", "amount_paise": 9000, "category": "drink"},
+        {"name": "Meals", "amount_paise": 36000, "category": "food", "quantity": 1},
+        {"name": "Filter Coffee x3", "amount_paise": 9000, "category": "drink", "quantity": 3},
     ],
     "tax_paise": 2250,
     "service_charge_paise": 0,
@@ -52,9 +52,9 @@ def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> 
     suggestions: list[Suggestion] = []
     for item in items:
         if item["category"] == "alcohol":
-            suggestions.append({"weights": {}, "reason": "Not sure who drank"})
+            suggestions.append({"weights": {}, "by_count": False, "reason": "Not sure who drank"})
         else:
-            suggestions.append({"weights": {p: FULL for p in people}, "reason": "Shared"})
+            suggestions.append({"weights": {p: FULL for p in people}, "by_count": False, "reason": "Shared"})
     return suggestions
 
 
@@ -67,5 +67,7 @@ def correct_assignments(people: list[str], items: list[AssignedItem], note: str)
     for item in items:
         if "Jamun" in item["name"]:
             weights = {p: w for p, w in item["weights"].items() if p not in named}
-            corrections.append({"receipt": item["receipt"], "item": item["item"], "weights": weights})
+            corrections.append(
+                {"receipt": item["receipt"], "item": item["item"], "weights": weights, "by_count": False}
+            )
     return corrections

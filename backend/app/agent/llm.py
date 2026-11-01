@@ -15,11 +15,13 @@ from pydantic import BaseModel, Field
 
 from app.agent.receipt import (
     AssignedItem,
+    Assignment,
     Category,
     Correction,
     LineItem,
     Receipt,
     Suggestion,
+    assignment_problem,
     default_suggestion,
     to_paise,
 )
@@ -32,6 +34,7 @@ from app.money.split import FULL, HALF
 class ReadLine(BaseModel):
     name: str = Field(description="Item name as printed, keeping quantities, e.g. 'Kingfisher x2'")
     amount: str = Field(description="The line total exactly as printed, e.g. '400.00'")
+    quantity: int = Field(description="How many were ordered, e.g. 2 for 'Kingfisher x2'; 1 if not shown")
     category: Category
 
 
@@ -51,6 +54,11 @@ class ReceiptReading(BaseModel):
 class PersonShare(BaseModel):
     name: str
     share: Literal["full", "half"]
+    count: int = Field(
+        default=0,
+        description="Only if the note says how many of the item this person had, e.g. 1 for "
+        "'Priya had one coffee'; otherwise 0",
+    )
 
 
 class ItemSuggestion(BaseModel):
@@ -90,7 +98,12 @@ def amount_or_zero(amount: str) -> int:
 
 def reading_to_receipt(reading: ReceiptReading) -> Receipt:
     items: list[LineItem] = [
-        {"name": line.name, "amount_paise": amount_or_zero(line.amount), "category": line.category}
+        {
+            "name": line.name,
+            "amount_paise": amount_or_zero(line.amount),
+            "category": line.category,
+            "quantity": max(line.quantity, 1),  # never 0 or negative, whatever was read
+        }
         for line in reading.items
     ]
     service_charge = 0
@@ -110,16 +123,22 @@ def reading_to_receipt(reading: ReceiptReading) -> Receipt:
     }
 
 
-def to_weights(shares: list[PersonShare], people: list[str]) -> dict[str, int]:
-    """Gemini's list of people -> {person: FULL/HALF}. Any name not in the split -> {} (ask)."""
+def to_assignment(shares: list[PersonShare], people: list[str]) -> Assignment:
+    """Gemini's list of people -> an assignment. If any count is given, the item is split by
+    count and people without a count are left for the user. Any name not in the split -> no
+    one (ask)."""
+    by_count = any(share.count > 0 for share in shares)
     people_by_lowercase = {person.lower(): person for person in people}
     weights = {}
     for share in shares:
         person = people_by_lowercase.get(share.name.strip().lower())
         if person is None:
-            return {}
-        weights[person] = FULL if share.share == "full" else HALF
-    return weights
+            return {"weights": {}, "by_count": by_count}
+        if not by_count:
+            weights[person] = FULL if share.share == "full" else HALF
+        elif share.count > 0:
+            weights[person] = share.count
+    return {"weights": weights, "by_count": by_count}
 
 
 def to_suggestions(
@@ -136,28 +155,32 @@ def to_suggestions(
             suggestions.append(default_suggestion(item, people))
             continue
 
-        weights = to_weights(exception.people, people)
-        if weights or not exception.people:  # valid people, or Gemini itself said "ask"
-            suggestions.append({"weights": weights, "reason": exception.reason})
+        assignment = to_assignment(exception.people, people)
+        counted = sum(assignment["weights"].values())
+        if assignment["by_count"] and counted > item["quantity"]:  # more than were ordered
+            suggestions.append({"weights": {}, "by_count": True, "reason": "Not sure who had how many"})
+        elif assignment["weights"] or not exception.people:  # valid people, or Gemini said "ask"
+            suggestions.append({**assignment, "reason": exception.reason})
         else:  # Gemini named someone who isn't in this split
-            suggestions.append({"weights": {}, "reason": "Not sure who had this"})
+            suggestions.append({"weights": {}, "by_count": False, "reason": "Not sure who had this"})
     return suggestions
 
 
 def to_corrections(
     answer: CorrectionChanges, people: list[str], items: list[AssignedItem]
 ) -> list[Correction]:
-    """Keep only changes that point at a real item and leave it with real people."""
-    known_items = {(item["receipt"], item["item"]) for item in items}
+    """Keep only changes that point at a real item and leave it fully assigned to real people."""
+    items_by_id = {(item["receipt"], item["item"]): item for item in items}
 
     corrections: list[Correction] = []
     for change in answer.changes:
-        if (change.receipt, change.item) not in known_items:
+        item = items_by_id.get((change.receipt, change.item))
+        if item is None:
             continue
 
-        weights = to_weights(change.people, people)
-        if weights:  # an item can't be left with nobody
-            corrections.append({"receipt": change.receipt, "item": change.item, "weights": weights})
+        assignment = to_assignment(change.people, people)
+        if assignment_problem(assignment, item["quantity"]) is None:
+            corrections.append({"receipt": change.receipt, "item": change.item, **assignment})
     return corrections
 
 
@@ -166,7 +189,8 @@ def to_corrections(
 READ_PROMPT = """You are reading a photo of a restaurant or shop bill from India.
 
 List every ordered line with its name as printed (keep quantities such as "x2"), its line
-total as printed, and a category: food, drink (non-alcoholic), alcohol (beer, wine, spirits,
+total as printed, how many were ordered (the quantity: 1 if the bill doesn't show one), and a
+category: food, drink (non-alcoholic), alcohol (beer, wine, spirits,
 cocktails) or dessert.
 
 List every charge below the items separately, exactly as printed: each tax line (CGST, SGST,
@@ -189,6 +213,9 @@ handled automatically). For each item you list, say who had it:
 - If the note clearly says someone did not have it ("Ravi doesn't drink" for alcohol,
   "Meena left before dessert" for desserts), list everyone else.
 - Use "half" for anyone the note says had only a little of it.
+- If the note says how many of an item someone had ("Priya had one cold coffee"), give each
+  person's count instead. Only give counts the note states; leave anyone else out, so the user
+  is asked about the rest.
 - If the note is about the item but doesn't say for sure who had it, give an empty list of
   people, so the user is asked. Never guess.
 - A preference is not an exclusion: "doesn't take sugar" or "doesn't like spicy food" doesn't
@@ -207,6 +234,8 @@ The user rejected the split with this note: "{note}"
 
 Return the changes the note asks for. For each changed item, give its receipt and item numbers
 and the full list of people who had it after the change (not just the people who changed).
+- If the note says how many of an item someone had, give a count for everyone who had it,
+  adding up to the item's quantity.
 - Only change items the note clearly refers to.
 - Only use names from the list of people.
 - If the note is unclear, unrelated to who had which item, or not a real sentence, return no
@@ -237,7 +266,8 @@ def read_receipt(receipt_id: str, feedback: str | None) -> Receipt:
 
 def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> list[Suggestion]:
     numbered_items = "\n".join(
-        f"{index}. {item['name']} ({item['category']})" for index, item in enumerate(items)
+        f"{index}. {item['name']} ({item['category']}, quantity {item['quantity']})"
+        for index, item in enumerate(items)
     )
     prompt = ASSIGN_PROMPT.format(people=", ".join(people), note=note, items=numbered_items)
     answer = gemini().with_structured_output(AssignmentSuggestions).invoke(prompt)
@@ -248,7 +278,8 @@ def correct_assignments(
     people: list[str], items: list[AssignedItem], note: str
 ) -> list[Correction]:
     listed_items = "\n".join(
-        f"{item['receipt']}.{item['item']} {item['name']}: {describe_people(item['weights'])}"
+        f"{item['receipt']}.{item['item']} {item['name']} (quantity {item['quantity']}): "
+        f"{describe_people(item)}"
         for item in items
     )
     prompt = CORRECT_PROMPT.format(people=", ".join(people), items=listed_items, note=note)
@@ -256,6 +287,9 @@ def correct_assignments(
     return to_corrections(answer, people, items)
 
 
-def describe_people(weights: dict[str, int]) -> str:
-    """{"Arun": FULL, "Priya": HALF} -> "Arun, Priya (half)"."""
+def describe_people(assignment: Assignment) -> str:
+    """Shared: "Arun, Priya (half)". By count: "Arun had 2, Priya had 1"."""
+    weights = assignment["weights"]
+    if assignment["by_count"]:
+        return ", ".join(f"{name} had {count}" for name, count in weights.items())
     return ", ".join(name if weight == FULL else f"{name} (half)" for name, weight in weights.items())

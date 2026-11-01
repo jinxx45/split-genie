@@ -12,6 +12,9 @@ class Item:
     name: str
     amount_paise: int
     weights: dict[str, int]  # person -> FULL or HALF; people not listed didn't have it
+    # True when the item is split by count: weights are how many each person had ("Cold Coffee x3":
+    # Priya 1, Arun 2). The maths is the same, since the item is split in proportion either way.
+    by_count: bool = False
 
 
 @dataclass
@@ -28,7 +31,8 @@ class ItemShare:
     item: str
     amount_paise: int
     shared_by: int  # how many people had the item
-    half: bool  # whether this person had a half share
+    half: bool  # a half share next to someone with a full one (alone, a half share pays it all)
+    count: int | None = None  # how many of the item they had, when it is split by count
 
 
 @dataclass
@@ -67,11 +71,13 @@ def compute_breakdown(bill: Bill) -> dict[str, PersonBreakdown]:
     items_by_person: dict[str, list[ItemShare]] = {}
     for item in bill.items:
         for person, amount in allocate(item.amount_paise, item.weights).items():
+            weight = item.weights[person]
             share = ItemShare(
                 item=item.name,
                 amount_paise=amount,
                 shared_by=len(item.weights),
-                half=item.weights[person] == HALF,
+                half=not item.by_count and weight == HALF and FULL in item.weights.values(),
+                count=weight if item.by_count else None,
             )
             items_by_person.setdefault(person, []).append(share)
 

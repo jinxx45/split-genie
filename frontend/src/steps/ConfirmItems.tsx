@@ -16,8 +16,10 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
   const total = itemsTotal + receipt.tax_paise + receipt.service_charge_paise
   const matches = total === receipt.printed_total_paise
 
-  function update(index: number, name: string, amountPaise: number) {
-    const items = receipt.items.map((item, i) => (i === index ? { ...item, name, amount_paise: amountPaise } : item))
+  function update(index: number, name: string, amountPaise: number, quantity: number) {
+    const items = receipt.items.map((item, i) =>
+      i === index ? { ...item, name, amount_paise: amountPaise, quantity } : item,
+    )
     setReceipt({ ...receipt, items })
     setEditing(null)
   }
@@ -49,7 +51,8 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
                 key={index}
                 name={item.name}
                 amountPaise={item.amount_paise}
-                onSave={(name, amount) => update(index, name, amount)}
+                quantity={item.quantity}
+                onSave={(name, amount, quantity) => update(index, name, amount, quantity)}
                 onCancel={() => setEditing(null)}
               />
             ) : (
@@ -100,13 +103,16 @@ function Line({ label, paise }: { label: string; paise: number }) {
 function EditLine(props: {
   name: string
   amountPaise: number
-  onSave: (name: string, amountPaise: number) => void
+  quantity: number
+  onSave: (name: string, amountPaise: number, quantity: number) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState(props.name)
   const [amount, setAmount] = useState(toRupeesText(props.amountPaise))
+  const [quantity, setQuantity] = useState(String(props.quantity))
   const paise = parseRupees(amount)
-  const valid = name.trim() !== '' && paise !== null
+  const count = /^\d{1,3}$/.test(quantity) && Number(quantity) > 0 ? Number(quantity) : null
+  const valid = name.trim() !== '' && paise !== null && count !== null
 
   return (
     <li className="-mx-2 my-1 rounded-xl bg-steel p-2">
@@ -117,6 +123,16 @@ function EditLine(props: {
           aria-label="Item name"
           className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1.5"
         />
+        <label className="flex items-center rounded-lg bg-white pl-2">
+          <span aria-hidden className="text-muted">×</span>
+          <input
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            inputMode="numeric"
+            aria-label="How many were ordered"
+            className="amount w-8 bg-transparent py-1.5 text-center"
+          />
+        </label>
         <input
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
@@ -132,7 +148,7 @@ function EditLine(props: {
         <button
           type="button"
           disabled={!valid}
-          onClick={() => valid && props.onSave(name.trim(), paise)}
+          onClick={() => valid && props.onSave(name.trim(), paise, count)}
           className="rounded-lg bg-brand px-3 py-1 text-white disabled:bg-muted/40"
         >
           Save

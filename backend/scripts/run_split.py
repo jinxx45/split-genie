@@ -17,7 +17,7 @@ from langgraph.types import Command
 
 from app.agent import llm
 from app.agent.graph import build_graph, new_split
-from app.agent.receipt import format_rupees, to_paise
+from app.agent.receipt import Assignment, format_rupees, to_paise
 from app.config import settings
 from app.money.split import FULL, HALF
 from app.observability import configure_logging, enable_langsmith_if_configured
@@ -103,7 +103,7 @@ def ask_review(question: dict, people: list[str]) -> dict:
         flag = "  ← please answer" if entry["needs_answer"] else ""
         print(f"  {entry['index']}. {entry['item']['name']:<32} {who:<30} {entry['reason']}{flag}")
 
-    changes: dict[str, dict[str, int]] = {}
+    changes: dict[str, Assignment] = {}
     for entry in question["items"]:
         if entry["needs_answer"]:
             changes[str(entry["index"])] = read_people(f"Who had {entry['item']['name']}? ", people)
@@ -141,7 +141,12 @@ def ask_approval(question: dict) -> dict:
     for person, part in question["breakdown"].items():
         print(f"  {person:<38} {format_rupees(part['total_paise']):>11}")
         for share in part["items"]:
-            who = f"just {person}" if share["shared_by"] == 1 else f"shared by {share['shared_by']}"
+            if share["count"] is not None:
+                who = f"had {share['count']}"
+            elif share["shared_by"] == 1:
+                who = f"just {person}"
+            else:
+                who = f"shared by {share['shared_by']}"
             if share["half"]:
                 who += ", half share"
             print(f"      {share['item']:<30} {who:<22} {format_rupees(share['amount_paise']):>10}")
@@ -161,9 +166,10 @@ def ask_approval(question: dict) -> dict:
 # --- Reading names and amounts typed by the user ---
 
 
-def read_people(prompt: str, people: list[str]) -> dict[str, int]:
-    """'Arun, Priya*' -> {"Arun": FULL, "Priya": HALF}. A * marks a half share."""
-    print(f"  Names separated by commas; add * for a half share. People: {', '.join(people)}")
+def read_people(prompt: str, people: list[str]) -> Assignment:
+    """Ask who had an item, until the answer can be read (see parse_people)."""
+    print("  Names separated by commas; add * for a half share, or =N for how many they had.")
+    print(f"  People: {', '.join(people)}")
     while True:
         answer = input(prompt).strip()
         try:
@@ -172,17 +178,25 @@ def read_people(prompt: str, people: list[str]) -> dict[str, int]:
             print(f"  {problem}")
 
 
-def parse_people(answer: str, people: list[str]) -> dict[str, int]:
+def parse_people(answer: str, people: list[str]) -> Assignment:
+    """'Arun, Priya*' -> shared, Priya with a half share.
+    'Arun=2, Priya=1' -> by count: Arun had 2, Priya had 1."""
+    by_count = "=" in answer
     by_lowercase = {person.lower(): person for person in people}
     weights = {}
     for part in answer.split(","):
-        name = part.strip()
-        weight = HALF if name.endswith("*") else FULL
+        name, _, count = part.partition("=")
+        name = name.strip()
         person = by_lowercase.get(name.rstrip("*").strip().lower())
         if person is None:
             raise ValueError(f"Unknown name: {name or '(empty)'}")
-        weights[person] = weight
-    return weights
+        if not by_count:
+            weights[person] = HALF if name.endswith("*") else FULL
+        elif count.strip().isdigit() and int(count) > 0:
+            weights[person] = int(count)
+        else:
+            raise ValueError(f"Give {person} a count of 1 or more, e.g. {person}=1")
+    return {"weights": weights, "by_count": by_count}
 
 
 def parse_payers(answer: str, people: list[str], total: int) -> dict[str, int]:

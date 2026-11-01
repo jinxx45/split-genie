@@ -4,12 +4,12 @@ Pydantic checks each answer's shape and limits. The functions below add the chec
 the split itself: are these names in the split, does this item exist, does the money add up.
 """
 
-from typing import Literal
+from typing import Annotated
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, StrictBool
 
-from app.agent.receipt import Category, format_rupees
+from app.agent.receipt import Category, LineItem, assignment_problem, format_rupees
 
 MAX_PEOPLE = 20
 MAX_NAME_LENGTH = 40
@@ -24,12 +24,14 @@ PHOTO_TYPES = {  # what Gemini can read -> the file extension we save it with
     "image/heif": ".heif",
 }
 MAX_AMOUNT_PAISE = 10_000_000  # ₹1,00,000 per line, far above any real bill line
+MAX_QUANTITY = 999
 
 
 class ItemIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     amount_paise: int = Field(ge=0, le=MAX_AMOUNT_PAISE)
     category: Category
+    quantity: int = Field(default=1, ge=1, le=MAX_QUANTITY)
 
 
 class ReceiptIn(BaseModel):
@@ -42,10 +44,17 @@ class ReceiptIn(BaseModel):
     printed_total_paise: int = Field(ge=0, le=MAX_AMOUNT_PAISE)
 
 
+class AssignmentIn(BaseModel):
+    """Who had one item: FULL (2) or HALF (1) shares, or with by_count, how many each had."""
+
+    weights: dict[str, Annotated[int, Field(ge=1, le=MAX_QUANTITY)]]
+    by_count: bool = False
+
+
 class ReviewIn(BaseModel):
     """Answer to "who had what": only the items the user changed."""
 
-    changes: dict[int, dict[str, Literal[1, 2]]]  # item index -> {person: HALF (1) or FULL (2)}
+    changes: dict[int, AssignmentIn]  # item index -> who had it
 
 
 class PayerIn(BaseModel):
@@ -79,15 +88,16 @@ def clean_people(names: list[str]) -> list[str]:
     return people
 
 
-def check_review(review: ReviewIn, people: list[str], item_count: int) -> None:
-    for index, weights in review.changes.items():
-        if not 0 <= index < item_count:
+def check_review(review: ReviewIn, people: list[str], items: list[LineItem]) -> None:
+    for index, assignment in review.changes.items():
+        if not 0 <= index < len(items):
             raise reject(f"There is no item {index}.")
-        if not weights:
-            raise reject("Every item needs at least one person.")
-        unknown = [name for name in weights if name not in people]
+        unknown = [name for name in assignment.weights if name not in people]
         if unknown:
             raise reject(f"Not in this split: {', '.join(unknown)}.")
+        problem = assignment_problem(assignment.model_dump(), items[index]["quantity"])
+        if problem:
+            raise reject(f"{items[index]['name']}: {problem}")
 
 
 def check_payers(payer: PayerIn, people: list[str], total_paise: int) -> None:

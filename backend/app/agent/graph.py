@@ -19,10 +19,12 @@ from langgraph.types import interrupt
 
 from app.agent.receipt import (
     AssignedItem,
+    Assignment,
     Correction,
     LineItem,
     Receipt,
     Suggestion,
+    assignment_problem,
     default_suggestion,
     format_rupees,
     receipt_total,
@@ -49,7 +51,7 @@ CorrectAssignments = Callable[[list[str], list[AssignedItem], str], list[Correct
 
 class FinishedReceipt(TypedDict):
     receipt: Receipt
-    assignments: list[dict[str, int]]
+    assignments: list[Assignment]
     paid: dict[str, int]
 
 
@@ -60,7 +62,7 @@ class SplitState(TypedDict):
     current: int  # index into receipt_ids of the receipt being worked on
     attempts: int  # extraction attempts for the current receipt
     receipt: Receipt | None
-    assignments: list[dict[str, int]]  # one per item: person -> FULL/HALF; empty = not decided
+    assignments: list[Assignment]  # one per item; empty weights = not decided
     reasons: list[str]  # one per item: why it was assigned that way
     paid: dict[str, int]  # who paid the current receipt, in paise
     finished: list[FinishedReceipt]
@@ -135,7 +137,10 @@ def auto_assign(state: SplitState, suggest_assignments: SuggestAssignments) -> d
         suggestions = [default_suggestion(item, state["people"]) for item in items]
 
     return {
-        "assignments": [suggestion["weights"] for suggestion in suggestions],
+        "assignments": [
+            {"weights": suggestion["weights"], "by_count": suggestion["by_count"]}
+            for suggestion in suggestions
+        ],
         "reasons": [suggestion["reason"] for suggestion in suggestions],
     }
 
@@ -143,9 +148,9 @@ def auto_assign(state: SplitState, suggest_assignments: SuggestAssignments) -> d
 def review_assignments(state: SplitState) -> dict:
     """Pause and show every item with the suggested people, so the user can fix any of them.
 
-    Unclear items (no suggestion) must be answered. The answer lists only what the user
-    changed: {"changes": {item index: {person: weight}}}. No changes means "the suggestions
-    are right". (The answer is wrapped in "changes" because LangGraph treats a bare empty
+    Unclear items (no one yet, or counts that don't add up) must be answered. The answer lists
+    only what the user changed: {"changes": {item index: assignment}}. No changes means "the
+    suggestions are right". (The answer is wrapped in "changes" because LangGraph treats a bare empty
     dict sent with `resume` as "no answer".)
     """
     unclear = unclear_items(state)
@@ -163,8 +168,8 @@ def review_assignments(state: SplitState) -> dict:
     answer = interrupt({"step": "review_assignments", "people": state["people"], "items": items})
 
     assignments = list(state["assignments"])
-    for index, weights in answer["changes"].items():
-        assignments[int(index)] = weights
+    for index, assignment in answer["changes"].items():
+        assignments[int(index)] = assignment
     return {"assignments": assignments}
 
 
@@ -269,10 +274,10 @@ def apply_correction(state: SplitState, correct_assignments: CorrectAssignments)
             {
                 "item": done["receipt"]["items"][correction["item"]]["name"],
                 "before": done["assignments"][correction["item"]],
-                "after": correction["weights"],
+                "after": {"weights": correction["weights"], "by_count": correction["by_count"]},
             }
         )
-        done["assignments"][correction["item"]] = correction["weights"]
+        done["assignments"][correction["item"]] = changes[-1]["after"]
     return {"finished": finished, "approval_error": None, "last_changes": changes}
 
 
@@ -305,8 +310,8 @@ def to_bill(done: FinishedReceipt) -> Bill:
     receipt = done["receipt"]
     return Bill(
         items=[
-            Item(item["name"], item["amount_paise"], weights)
-            for item, weights in zip(receipt["items"], done["assignments"])
+            Item(item["name"], item["amount_paise"], assignment["weights"], assignment["by_count"])
+            for item, assignment in zip(receipt["items"], done["assignments"])
         ],
         tax_paise=receipt["tax_paise"],
         service_charge_paise=receipt["service_charge_paise"],
@@ -323,7 +328,8 @@ def assigned_items(finished: list[FinishedReceipt]) -> list[AssignedItem]:
                     "receipt": receipt_index,
                     "item": item_index,
                     "name": item["name"],
-                    "weights": done["assignments"][item_index],
+                    "quantity": item["quantity"],
+                    **done["assignments"][item_index],
                 }
             )
     return items
@@ -333,7 +339,13 @@ def assigned_items(finished: list[FinishedReceipt]) -> list[AssignedItem]:
 
 
 def unclear_items(state: SplitState) -> list[int]:
-    return [index for index, weights in enumerate(state["assignments"]) if not weights]
+    """Items with no one yet, or with counts that don't add up to how many were ordered."""
+    items = state["receipt"]["items"]
+    return [
+        index
+        for index, (item, assignment) in enumerate(zip(items, state["assignments"]))
+        if assignment_problem(assignment, item["quantity"])
+    ]
 
 
 def after_extract(state: SplitState) -> str:

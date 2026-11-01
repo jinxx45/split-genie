@@ -42,7 +42,7 @@ def answer(client, split_id, body):
 def to_payer_step(client):
     split = create(client).json()
     answer(client, split["id"], DINNER)
-    answer(client, split["id"], {"changes": {"1": {"Arun": 2, "Ravi": 2}}})
+    answer(client, split["id"], {"changes": {"1": {"weights": {"Arun": 2, "Ravi": 2}}}})
     return split["id"]
 
 
@@ -59,7 +59,9 @@ def test_a_split_from_photo_to_payments(client):
     split = answer(client, split["id"], DINNER).json()
     assert split["question"]["step"] == "review_assignments"
 
-    split = answer(client, split["id"], {"changes": {"1": {"Arun": 2, "Ravi": 2}}}).json()
+    # Kingfisher x2: Arun had 1, Ravi had 1.
+    by_count = {"weights": {"Arun": 1, "Ravi": 1}, "by_count": True}
+    split = answer(client, split["id"], {"changes": {"1": by_count}}).json()
     assert split["question"]["step"] == "payer"
 
     split = answer(client, split["id"], {"paid": {"Priya": 123200}}).json()
@@ -150,10 +152,13 @@ def test_bad_receipt_edits_are_rejected(client):
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"9": {"Arun": 2}}, "no item 9"),
-        ({"1": {"Rahul": 2}}, "Not in this split: Rahul"),
-        ({"1": {}}, "at least one person"),
-        ({"1": {"Arun": 3}}, "changes.1.Arun"),
+        ({"9": {"weights": {"Arun": 2}}}, "no item 9"),
+        ({"1": {"weights": {"Rahul": 2}}}, "Not in this split: Rahul"),
+        ({"1": {"weights": {}}}, "at least one person"),
+        ({"1": {"weights": {"Arun": 3}}}, "full or half"),
+        ({"1": {"weights": {"Arun": 1}, "by_count": True}}, "Kingfisher x2: 1 of 2 still need a name"),
+        ({"1": {"weights": {"Arun": 2, "Ravi": 1}, "by_count": True}}, "only 2 were ordered"),
+        ({"1": {"weights": {"Arun": 0}, "by_count": True}}, "changes.1.weights.Arun"),
     ],
 )
 def test_bad_review_answers_are_rejected_and_nothing_changes(client, changes, message):

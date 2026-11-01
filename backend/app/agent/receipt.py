@@ -6,7 +6,7 @@ Plain data and small helpers only. No AI in here.
 from decimal import Decimal, InvalidOperation
 from typing import Literal, TypedDict
 
-from app.money.split import FULL
+from app.money.split import FULL, HALF
 
 Category = Literal["food", "drink", "alcohol", "dessert"]
 
@@ -15,6 +15,7 @@ class LineItem(TypedDict):
     name: str
     amount_paise: int
     category: Category
+    quantity: int  # how many were ordered, e.g. 3 for "Cold Coffee x3"
 
 
 class Receipt(TypedDict):
@@ -25,36 +26,66 @@ class Receipt(TypedDict):
     printed_total_paise: int  # the total printed at the bottom of the bill
 
 
-class Suggestion(TypedDict):
-    """Who the agent thinks had one item, and why."""
+class Assignment(TypedDict):
+    """Who had one item, in one of two ways:
+    - shared (by_count False): weights are FULL or HALF shares, e.g. a biryani everyone ate;
+    - by count (by_count True): weights are how many each person had, adding up to the item's
+      quantity, e.g. "Cold Coffee x3": {"Priya": 1, "Arun": 2}.
+    Empty weights mean "not decided yet".
+    """
 
-    weights: dict[str, int]  # person -> FULL or HALF; empty means "not sure, ask the user"
+    weights: dict[str, int]
+    by_count: bool
+
+
+class Suggestion(Assignment):
+    """The agent's assignment for one item, and why."""
+
     reason: str  # shown to the user on the review screen
 
 
-class AssignedItem(TypedDict):
+class AssignedItem(Assignment):
     """An item from a finished receipt and who had it, as shown when correcting the split."""
 
     receipt: int  # index of the receipt in the split
     item: int  # index of the item on that receipt
     name: str
-    weights: dict[str, int]
+    quantity: int
 
 
-class Correction(TypedDict):
-    """A fix to one item: the new list of who had it."""
+class Correction(Assignment):
+    """A fix to one item: the new, complete assignment."""
 
     receipt: int
     item: int
-    weights: dict[str, int]  # never empty: every item must have someone
 
 
 def default_suggestion(item: LineItem, people: list[str]) -> Suggestion:
     """What we assume when the note says nothing about an item: food and desserts are shared,
-    drinks are usually one person's, so ask."""
+    drinks are usually one person's, so ask (by count when several were ordered)."""
     if item["category"] in ("drink", "alcohol"):
-        return {"weights": {}, "reason": "Drinks are usually one person's: who had it?"}
-    return {"weights": {person: FULL for person in people}, "reason": "Shared by everyone"}
+        if item["quantity"] > 1:
+            return {"weights": {}, "by_count": True, "reason": "Drinks are usually one each: who had how many?"}
+        return {"weights": {}, "by_count": False, "reason": "Drinks are usually one person's: who had it?"}
+    return {"weights": {person: FULL for person in people}, "by_count": False, "reason": "Shared by everyone"}
+
+
+def assignment_problem(assignment: Assignment, quantity: int) -> str | None:
+    """Why an item's assignment isn't finished, in words for the user; None if it is."""
+    weights = assignment["weights"]
+    if not weights:
+        return "Every item needs at least one person."
+    if assignment["by_count"]:
+        if any(count < 1 for count in weights.values()):
+            return "Each count must be at least 1."
+        assigned = sum(weights.values())
+        if assigned < quantity:
+            return f"{quantity - assigned} of {quantity} still need a name."
+        if assigned > quantity:
+            return f"That's {assigned}, but only {quantity} were ordered."
+    elif any(weight not in (FULL, HALF) for weight in weights.values()):
+        return "Each share must be full or half."
+    return None
 
 
 def receipt_total(receipt: Receipt) -> int:

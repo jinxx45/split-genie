@@ -1,7 +1,7 @@
 // Step 4: approve the split, or say what's wrong and let Split Genie fix it.
 
 import { useState } from 'react'
-import type { Question, Weights } from '../api'
+import type { Assignment, Question } from '../api'
 import type { StepProps } from '../pages/SplitPage'
 import { ErrorText, PrimaryButton, Screen, SecondaryButton } from '../ui'
 import { BreakdownList, Payments } from './Summary'
@@ -67,8 +67,9 @@ export function Approve({ question, people, answer, busy, error }: Props) {
   )
 }
 
-function names(weights: Weights): string {
+/** Shared: "Arun, Priya (half)". By count: "Arun 2, Priya 1". */
+function names({ weights, by_count }: Assignment): string {
   return Object.entries(weights)
-    .map(([person, weight]) => (weight === 1 ? `${person} (half)` : person))
+    .map(([person, weight]) => (by_count ? `${person} ${weight}` : weight === 1 ? `${person} (half)` : person))
     .join(', ')
 }

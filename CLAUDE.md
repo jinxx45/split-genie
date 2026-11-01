@@ -21,7 +21,7 @@ PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-h
 - **The LLM never does money maths.** It extracts and assigns; shares, tax split and settlement are deterministic Python functions with tests.
 - **Money is integer paise**, never floats. Shares must always sum exactly to the bill total.
 - **Mobile first.** Every screen must work one-handed at 375 px wide.
-- **V1 scope only.** Splitting modes (friend review or claiming) and phone OTP are V2. Check the PRD before adding features.
+- **Full product, no V1/V2 split.** Build each feature end to end (backend, agent, API, UI, tests). Keep the PRD in step with what's built.
 
 ### Teaching mode
 

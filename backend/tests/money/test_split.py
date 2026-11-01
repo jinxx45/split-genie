@@ -116,3 +116,24 @@ def test_breakdown_totals_are_the_shares_and_add_up_to_the_bill():
 
     assert {person: part.total_paise for person, part in breakdown.items()} == compute_shares(bill)
     assert sum(part.total_paise for part in breakdown.values()) == 33333 + 9999 + 2777 + 5555
+
+
+def test_split_by_count_pays_for_what_each_had():
+    # Cold Coffee x3 for ₹582: Priya had 1, Arun had 2.
+    bill = Bill(items=[Item("Cold Coffee x3", 58200, {"priya": 1, "arun": 2}, by_count=True)])
+
+    breakdown = compute_breakdown(bill)
+
+    assert breakdown["priya"].items == [
+        ItemShare(item="Cold Coffee x3", amount_paise=19400, shared_by=2, half=False, count=1)
+    ]
+    assert breakdown["arun"].items[0].amount_paise == 38800
+
+
+def test_a_half_share_alone_pays_it_all_and_is_not_called_half():
+    bill = Bill(items=[Item("Cold Coffee", 58200, {"priya": HALF})])
+
+    share = compute_breakdown(bill)["priya"].items[0]
+
+    assert share.amount_paise == 58200
+    assert not share.half

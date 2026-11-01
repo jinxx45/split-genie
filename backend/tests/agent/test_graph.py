@@ -50,7 +50,7 @@ def test_full_dinner_flow_pauses_three_times_then_settles():
     assert question["step"] == "review_assignments"
     assert len(question["items"]) == 3
     assert [i["item"]["name"] for i in question["items"] if i["needs_answer"]] == ["Kingfisher x2"]
-    answer(graph, config, {"changes": {"1": {"arun": FULL, "ravi": FULL}}})
+    answer(graph, config, {"changes": {"1": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}}})
 
     # Pause 3: who paid
     question = paused_at(graph, config)
@@ -110,7 +110,7 @@ def test_user_can_remove_someone_from_an_item_the_agent_was_sure_about():
     answer(
         graph,
         config,
-        {"changes": {"1": {"arun": FULL, "ravi": FULL}, "2": {"arun": FULL, "ravi": FULL}}},
+        {"changes": {"1": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}, "2": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}}},
     )
     answer(graph, config, {"arun": 123200})
 
@@ -143,7 +143,7 @@ def test_two_receipts_with_different_payers_are_settled_together():
     graph, config = start(["dinner", "lunch"])
 
     answer(graph, config, DINNER)
-    answer(graph, config, {"changes": {"1": {"arun": FULL, "ravi": FULL}}})
+    answer(graph, config, {"changes": {"1": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}}})
     answer(graph, config, {"priya": 123200})
     answer(graph, config, LUNCH)
     answer(graph, config, {"changes": {}})
@@ -164,8 +164,10 @@ def test_without_a_note_the_default_rule_is_used_and_the_ai_is_not_called():
     answer(graph, config, DINNER)
 
     biryani, beer, dessert = paused_at(graph, config)["items"]
-    assert biryani["suggested"] == dessert["suggested"] == {p: FULL for p in PEOPLE}
-    assert beer["suggested"] == {} and beer["needs_answer"]
+    everyone = {"weights": {p: FULL for p in PEOPLE}, "by_count": False}
+    assert biryani["suggested"] == dessert["suggested"] == everyone
+    # Kingfisher x2: drinks are usually one each, so ask who had how many.
+    assert beer["suggested"] == {"weights": {}, "by_count": True} and beer["needs_answer"]
 
 
 def test_split_resumes_from_a_new_graph_using_the_same_checkpointer():
@@ -188,7 +190,7 @@ def run_dinner_to_approval(**graph_options):
     """Dinner for three, Arun and Ravi had the beer, Priya paid. Stops at the approval screen."""
     graph, config = start(["dinner"], **graph_options)
     answer(graph, config, DINNER)
-    answer(graph, config, {"changes": {"1": {"arun": FULL, "ravi": FULL}}})
+    answer(graph, config, {"changes": {"1": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}}})
     answer(graph, config, {"priya": 123200})
     return graph, config
 
@@ -258,7 +260,13 @@ def test_approval_shows_how_each_persons_total_is_made_up():
 
     priya = question["breakdown"]["priya"]
     assert [share["item"] for share in priya["items"]] == ["Chicken Biryani", "Gulab Jamun"]
-    assert priya["items"][0] == {"item": "Chicken Biryani", "amount_paise": 20000, "shared_by": 3, "half": False}
+    assert priya["items"][0] == {
+        "item": "Chicken Biryani",
+        "amount_paise": 20000,
+        "shared_by": 3,
+        "half": False,
+        "count": None,
+    }
     for person, part in question["breakdown"].items():
         assert part["total_paise"] == question["shares"][person]
     assert question["changes"] == []  # nothing corrected yet
@@ -272,7 +280,7 @@ def test_approval_after_a_correction_lists_what_changed():
     assert paused_at(graph, config)["changes"] == [
         {
             "item": "Gulab Jamun",
-            "before": {"arun": FULL, "priya": FULL, "ravi": FULL},
-            "after": {"arun": FULL, "ravi": FULL},
+            "before": {"weights": {"arun": FULL, "priya": FULL, "ravi": FULL}, "by_count": False},
+            "after": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False},
         }
     ]

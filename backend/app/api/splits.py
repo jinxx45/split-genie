@@ -190,8 +190,9 @@ def checked_answer(question: dict, body: dict, values: dict) -> Any:
 
         if step == "review_assignments":
             review = ReviewIn.model_validate(body)
-            check_review(review, values["people"], len(values["receipt"]["items"]))
-            return {"changes": {str(index): weights for index, weights in review.changes.items()}}
+            check_review(review, values["people"], values["receipt"]["items"])
+            changes = {str(index): assignment.model_dump() for index, assignment in review.changes.items()}
+            return {"changes": changes}
 
         if step == "payer":
             payer = PayerIn.model_validate(body)

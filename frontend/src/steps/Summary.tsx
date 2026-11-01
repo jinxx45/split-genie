@@ -67,7 +67,11 @@ export function BreakdownPaper({ part }: { part: Breakdown }) {
             <span>
               {share.item}
               <span className="block text-xs text-muted">
-                {share.shared_by === 1 ? 'just them' : `shared by ${share.shared_by}`}
+                {share.count !== null
+                  ? `had ${share.count}`
+                  : share.shared_by === 1
+                    ? 'just them'
+                    : `shared by ${share.shared_by}`}
                 {share.half && ', half share'}
               </span>
             </span>

@@ -1,10 +1,13 @@
 // Types and calls for the Split Genie API. Shapes match backend/app/api/splits.py.
 
 export type Weight = 1 | 2 // 1 = half share, 2 = full share
-export type Weights = Record<string, Weight>
+
+/** Who had one item. Shared: FULL/HALF weights. By count: how many each had, adding up to the
+ * item's quantity. Empty weights: not decided yet. */
+export type Assignment = { weights: Record<string, number>; by_count: boolean }
 export type Category = 'food' | 'drink' | 'alcohol' | 'dessert'
 
-export type Item = { name: string; amount_paise: number; category: Category }
+export type Item = { name: string; amount_paise: number; category: Category; quantity: number }
 
 export type Receipt = {
   place: string // the restaurant or shop name; '' if the bill doesn't show one
@@ -14,15 +17,21 @@ export type Receipt = {
   printed_total_paise: number
 }
 
-export type ItemShare = { item: string; amount_paise: number; shared_by: number; half: boolean }
+export type ItemShare = {
+  item: string
+  amount_paise: number
+  shared_by: number
+  half: boolean // a half share next to someone with a full one
+  count: number | null // how many they had, when the item is split by count
+}
 export type Breakdown = { items: ItemShare[]; charges_paise: number; total_paise: number }
 export type Payment = { sender: string; receiver: string; amount_paise: number }
-export type Change = { item: string; before: Weights; after: Weights }
+export type Change = { item: string; before: Assignment; after: Assignment }
 
 export type ReviewItem = {
   index: number
   item: Item
-  suggested: Weights
+  suggested: Assignment
   reason: string
   needs_answer: boolean
 }

@@ -112,7 +112,7 @@ const NEXT_WEIGHT: Record<string, Weight | undefined> = { none: 2, '2': 1, '1': 
 export function ShareChip(props: {
   name: string
   color: string
-  weight: Weight | undefined
+  weight: number | undefined // FULL (2), HALF (1) or not included
   onChange: (weight: Weight | undefined) => void
 }) {
   const { name, color, weight } = props
