@@ -23,8 +23,9 @@ PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-h
 
 The owner is an experienced TypeScript/Angular developer who is new to Python.
 
-- When code introduces new Python syntax or idioms, explain them briefly, compared with the TypeScript equivalent.
-- For the parts the PRD marks as the owner's to write (settlement function, one graph node, the Pydantic receipt model), don't write the solution: leave a stub with a clear `TODO`, the tests it must pass, and hints.
+- Claude writes all the code. Don't leave exercises, stubs or `TODO`s for the owner.
+- After each change, explain every new concept and function: what it does, and why it is needed. Compare new Python syntax with the TypeScript equivalent.
+- Code must follow best practice and stay easy to maintain and extend.
 
 ---
 

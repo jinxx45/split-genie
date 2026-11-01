@@ -53,5 +53,5 @@ def compute_shares(bill: Bill) -> dict[str, int]:
 
 def balances(owed: dict[str, int], paid: dict[str, int]) -> dict[str, int]:
     """Net position per person: positive means they are owed money, negative means they owe."""
-    people = owed.keys() | paid.keys()
+    people = sorted(owed.keys() | paid.keys())  # sorted so results come out in the same order every run
     return {person: paid.get(person, 0) - owed.get(person, 0) for person in people}
