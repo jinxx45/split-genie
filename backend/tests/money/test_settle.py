@@ -1,4 +1,4 @@
-from app.settle import Payment, settle
+from app.money.settle import Payment, settle
 
 
 def apply(payments: list[Payment], balances: dict[str, int]) -> dict[str, int]:

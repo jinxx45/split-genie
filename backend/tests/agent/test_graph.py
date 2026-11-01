@@ -1,9 +1,9 @@
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from app.extract import DINNER, LUNCH
-from app.graph import build_graph, new_split
-from app.split import FULL
+from app.agent.extract import DINNER, LUNCH
+from app.agent.graph import build_graph, new_split
+from app.money.split import FULL
 
 PEOPLE = ["arun", "priya", "ravi"]
 

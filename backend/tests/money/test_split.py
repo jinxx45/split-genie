@@ -1,4 +1,4 @@
-from app.split import FULL, HALF, Bill, Item, allocate, balances, compute_shares
+from app.money.split import FULL, HALF, Bill, Item, allocate, balances, compute_shares
 
 
 def test_allocate_splits_evenly_when_possible():

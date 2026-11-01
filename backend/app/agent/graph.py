@@ -14,9 +14,9 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from app.extract import Receipt, extract_receipt, receipt_total, totals_match
-from app.settle import settle
-from app.split import FULL, Bill, Item, balances, compute_shares
+from app.agent.extract import Receipt, extract_receipt, receipt_total, totals_match
+from app.money.settle import settle
+from app.money.split import FULL, Bill, Item, balances, compute_shares
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
 

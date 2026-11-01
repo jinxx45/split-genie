@@ -10,6 +10,10 @@ PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-h
 ### Layout
 
 - `backend/` — Python: FastAPI, LangGraph, Pydantic
+  - `app/money/` — pure maths (shares, settlement). Must not import from `agent/` or `api/`.
+  - `app/agent/` — the LangGraph agent and receipt reading. May use `money/`.
+  - `app/api/` — HTTP endpoints. May use `agent/` and `money/`.
+  - `tests/` mirrors `app/`.
 - `frontend/` — React + Vite + TypeScript, Tailwind, shadcn/ui, mobile-first
 
 ### Rules for this codebase
