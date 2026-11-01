@@ -208,9 +208,8 @@ and the full list of people who had it after the change (not just the people who
 
 
 def gemini() -> ChatGoogleGenerativeAI:
-    return ChatGoogleGenerativeAI(
-        model=settings.gemini_model, api_key=settings.gemini_api_key, temperature=0
-    )
+    # No temperature: current Gemini models use fixed sampling defaults and ignore it.
+    return ChatGoogleGenerativeAI(model=settings.gemini_model, api_key=settings.gemini_api_key)
 
 
 def read_receipt(receipt_id: str, feedback: str | None) -> Receipt:
