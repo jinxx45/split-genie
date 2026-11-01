@@ -135,9 +135,13 @@ Items:
 
 For each item, decide who had it, using only the note:
 - If the note says nothing that covers an item, everyone shared it.
-- If the note rules people out (for example "Ravi doesn't drink" for alcohol), list everyone else.
+- If the note clearly says someone did not have an item (for example "Ravi doesn't drink"
+  for alcohol, or "Meena left before dessert" for desserts), list everyone else.
+- A preference is not an exclusion. "Doesn't take sugar" or "doesn't like spicy food" does not
+  say whether they had an item; they may have had it made their way.
 - Use "half" for anyone the note says had only a little of an item.
-- If you cannot tell who had an item, return an empty list of people for it.
+- If the note is relevant to an item but doesn't say for sure who had it, return an empty list
+  of people for it, so the user is asked. Never guess.
 - Only use names from the list of people.
 
 Return one entry per item, using the item's number as its index, with a short reason
