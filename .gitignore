@@ -7,6 +7,7 @@ __pycache__/
 # Environment
 .env
 .env.*
+!.env.example
 
 # OS / editors
 .DS_Store
