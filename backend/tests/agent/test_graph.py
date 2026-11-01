@@ -1,18 +1,24 @@
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from app.agent.extract import DINNER, LUNCH
 from app.agent.graph import build_graph, new_split
 from app.money.split import FULL
+from tests.agent import fakes
+from tests.agent.fakes import DINNER, LUNCH
 
 PEOPLE = ["arun", "priya", "ravi"]
+NOTE = "Not everyone drank"
 
 
-def start(receipt_ids, thread_id="test"):
+def make_graph(checkpointer=None, read_receipt=fakes.read_receipt, suggest=fakes.suggest_assignments):
+    return build_graph(checkpointer or InMemorySaver(), read_receipt, suggest)
+
+
+def start(receipt_ids, note=NOTE, **graph_options):
     """Start a split and run it until its first pause."""
-    graph = build_graph(InMemorySaver())
-    config = {"configurable": {"thread_id": thread_id}}
-    graph.invoke(new_split(PEOPLE, "", receipt_ids), config)
+    graph = make_graph(**graph_options)
+    config = {"configurable": {"thread_id": "test"}}
+    graph.invoke(new_split(PEOPLE, note, receipt_ids), config)
     return graph, config
 
 
@@ -55,12 +61,18 @@ def test_full_dinner_flow_pauses_three_times_then_settles():
     ]
 
 
-def test_misread_receipt_is_retried_before_asking_the_user():
-    graph, config = start(["blurry"])
+def test_misread_receipt_is_retried_with_feedback_before_asking_the_user():
+    feedback_seen = []
 
-    question = paused_at(graph, config)
-    assert question["totals_match"] is True
-    assert graph.get_state(config).values["attempts"] == 2
+    def reader(receipt_id, feedback):
+        feedback_seen.append(feedback)
+        return fakes.read_receipt(receipt_id, feedback)
+
+    graph, config = start(["blurry"], read_receipt=reader)
+
+    assert paused_at(graph, config)["totals_match"] is True
+    assert feedback_seen[0] is None
+    assert "₹692.00" in feedback_seen[1] and "₹1232.00" in feedback_seen[1]
 
 
 def test_unreadable_receipt_goes_to_the_user_after_two_retries():
@@ -79,6 +91,7 @@ def test_review_is_shown_even_when_nothing_is_unclear():
     question = paused_at(graph, config)
     assert question["step"] == "review_assignments"
     assert not any(i["needs_answer"] for i in question["items"])
+    assert question["items"][0]["reason"] == "Shared"
 
     answer(graph, config, {"changes": {}})  # "the suggestions are right"
     assert paused_at(graph, config)["step"] == "payer"
@@ -138,13 +151,24 @@ def test_two_receipts_with_different_payers_are_settled_together():
     assert len(final["payments"]) <= len(PEOPLE) - 1
 
 
+def test_without_a_note_everyone_shares_everything_and_the_ai_is_not_called():
+    def must_not_be_called(people, note, items):
+        raise AssertionError("no note, so no AI call expected")
+
+    graph, config = start(["dinner"], note="  ", suggest=must_not_be_called)
+    answer(graph, config, DINNER)
+
+    items = paused_at(graph, config)["items"]
+    assert all(i["suggested"] == {p: FULL for p in PEOPLE} for i in items)
+
+
 def test_split_resumes_from_a_new_graph_using_the_same_checkpointer():
     """Simulates closing the app and coming back later: same thread id, fresh graph."""
     checkpointer = InMemorySaver()
     config = {"configurable": {"thread_id": "goa-trip"}}
-    build_graph(checkpointer).invoke(new_split(PEOPLE, "", ["lunch"]), config)
+    make_graph(checkpointer).invoke(new_split(PEOPLE, NOTE, ["lunch"]), config)
 
-    later = build_graph(checkpointer)
+    later = make_graph(checkpointer)
 
     assert paused_at(later, config)["step"] == "confirm_items"
     answer(later, config, LUNCH)

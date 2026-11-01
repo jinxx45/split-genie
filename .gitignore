@@ -13,3 +13,6 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+
+# Receipt photos saved by the app
+uploads/

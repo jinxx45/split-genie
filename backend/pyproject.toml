@@ -5,6 +5,7 @@ description = "Split Genie API: FastAPI + LangGraph"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.162.0",
+    "langchain-google-genai>=4.4.2",
     "langgraph>=1.2.19",
     "pydantic-settings>=2.16.2",
     "uvicorn[standard]>=0.54.0",

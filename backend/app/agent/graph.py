@@ -7,18 +7,34 @@ Flow (see the PRD diagram):
     -> compute_shares -> settle
 """
 
+from collections.abc import Callable
 from dataclasses import asdict
+from functools import partial
 from typing import TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from app.agent.extract import Receipt, extract_receipt, receipt_total, totals_match
+from app.agent.receipt import (
+    LineItem,
+    Receipt,
+    Suggestion,
+    format_rupees,
+    receipt_total,
+    totals_match,
+)
 from app.money.settle import settle
 from app.money.split import FULL, Bill, Item, balances, compute_shares
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
+
+# The two AI steps, passed in so tests can use fakes and the app can use Gemini.
+ReadReceipt = Callable[[str, str | None], Receipt]
+"""(receipt id, feedback about the previous misread or None) -> the receipt as read."""
+
+SuggestAssignments = Callable[[list[str], str, list[LineItem]], list[Suggestion]]
+"""(people, the splitter's note, items) -> one suggestion per item, in the same order."""
 
 
 class FinishedReceipt(TypedDict):
@@ -35,6 +51,7 @@ class SplitState(TypedDict):
     attempts: int  # extraction attempts for the current receipt
     receipt: Receipt | None
     assignments: list[dict[str, int]]  # one per item: person -> FULL/HALF; empty = not decided
+    reasons: list[str]  # one per item: why it was assigned that way
     paid: dict[str, int]  # who paid the current receipt, in paise
     finished: list[FinishedReceipt]
     shares: dict[str, int]
@@ -52,6 +69,7 @@ def new_split(people: list[str], note: str, receipt_ids: list[str]) -> SplitStat
         "attempts": 0,
         "receipt": None,
         "assignments": [],
+        "reasons": [],
         "paid": {},
         "finished": [],
         "shares": {},
@@ -63,10 +81,19 @@ def new_split(people: list[str], note: str, receipt_ids: list[str]) -> SplitStat
 # --- Nodes: each takes the state and returns only the fields it changes ---
 
 
-def extract_items(state: SplitState) -> dict:
+def extract_items(state: SplitState, read_receipt: ReadReceipt) -> dict:
     receipt_id = state["receipt_ids"][state["current"]]
-    attempt = state["attempts"] + 1
-    return {"receipt": extract_receipt(receipt_id, attempt), "attempts": attempt}
+
+    feedback = None
+    previous = state["receipt"]
+    if previous is not None:  # a retry: tell the reader what went wrong last time
+        feedback = (
+            f"Your last reading added up to {format_rupees(receipt_total(previous))}, "
+            f"but the printed total is {format_rupees(previous['printed_total_paise'])}. "
+            "Read every line again carefully."
+        )
+
+    return {"receipt": read_receipt(receipt_id, feedback), "attempts": state["attempts"] + 1}
 
 
 def confirm_items(state: SplitState) -> dict:
@@ -78,15 +105,20 @@ def confirm_items(state: SplitState) -> dict:
     return {"receipt": corrected}
 
 
-def auto_assign(state: SplitState) -> dict:
-    """Fake rule until Milestone 4: food and desserts are shared by everyone, drinks are asked about."""
-    assignments = []
-    for item in state["receipt"]["items"]:
-        if item["category"] == "alcohol":
-            assignments.append({})
-        else:
-            assignments.append({person: FULL for person in state["people"]})
-    return {"assignments": assignments}
+def auto_assign(state: SplitState, suggest_assignments: SuggestAssignments) -> dict:
+    """Suggest who had each item. With no note there is nothing to go on, so everyone shares
+    everything (no AI call needed); the user fixes exceptions on the review screen."""
+    items = state["receipt"]["items"]
+    if state["note"].strip():
+        suggestions = suggest_assignments(state["people"], state["note"], items)
+    else:
+        everyone = {person: FULL for person in state["people"]}
+        suggestions = [{"weights": everyone, "reason": "Shared by everyone"} for _ in items]
+
+    return {
+        "assignments": [suggestion["weights"] for suggestion in suggestions],
+        "reasons": [suggestion["reason"] for suggestion in suggestions],
+    }
 
 
 def review_assignments(state: SplitState) -> dict:
@@ -105,6 +137,7 @@ def review_assignments(state: SplitState) -> dict:
                 "index": index,
                 "item": item,
                 "suggested": state["assignments"][index],
+                "reason": state["reasons"][index],
                 "needs_answer": index in unclear,
             }
         )
@@ -141,6 +174,7 @@ def finish_receipt(state: SplitState) -> dict:
         "attempts": 0,
         "receipt": None,
         "assignments": [],
+        "reasons": [],
         "paid": {},
     }
 
@@ -200,12 +234,18 @@ def after_finish(state: SplitState) -> str:
     return "compute_shares"
 
 
-def build_graph(checkpointer: BaseCheckpointSaver):
+def build_graph(
+    checkpointer: BaseCheckpointSaver,
+    read_receipt: ReadReceipt,
+    suggest_assignments: SuggestAssignments,
+):
     builder = StateGraph(SplitState)
 
-    builder.add_node("extract_items", extract_items)
+    builder.add_node("extract_items", partial(extract_items, read_receipt=read_receipt))
     builder.add_node("confirm_items", confirm_items)
-    builder.add_node("auto_assign", auto_assign)
+    builder.add_node(
+        "auto_assign", partial(auto_assign, suggest_assignments=suggest_assignments)
+    )
     builder.add_node("review_assignments", review_assignments)
     builder.add_node("ask_payer", ask_payer)
     builder.add_node("finish_receipt", finish_receipt)
