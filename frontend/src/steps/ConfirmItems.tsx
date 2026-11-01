@@ -34,6 +34,14 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
     >
       <p className="mb-4 text-muted">Tap any line to fix it.</p>
       <Paper>
+        <input
+          value={receipt.place}
+          onChange={(event) => setReceipt({ ...receipt, place: event.target.value })}
+          placeholder="Restaurant name"
+          aria-label="Restaurant name"
+          maxLength={100}
+          className="mb-2 w-full border-b border-dashed border-steel-dark pb-2 text-center font-display text-xl font-semibold"
+        />
         <ul>
           {receipt.items.map((item, index) =>
             editing === index ? (
@@ -69,7 +77,7 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
       </Paper>
 
       {matches ? (
-        <p className="mt-4 text-leaf">✓ Matches the total printed on the bill.</p>
+        <p className="mt-4 text-brand">✓ Matches the total printed on the bill.</p>
       ) : (
         <p className="mt-4 rounded-xl bg-turmeric-soft px-3 py-2">
           The bill says {formatRupees(receipt.printed_total_paise)}. Check the lines above for a misread price.
@@ -125,7 +133,7 @@ function EditLine(props: {
           type="button"
           disabled={!valid}
           onClick={() => valid && props.onSave(name.trim(), paise)}
-          className="rounded-lg bg-leaf px-3 py-1 text-white disabled:bg-muted/40"
+          className="rounded-lg bg-brand px-3 py-1 text-white disabled:bg-muted/40"
         >
           Save
         </button>

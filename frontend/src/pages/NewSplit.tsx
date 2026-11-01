@@ -93,7 +93,7 @@ export function NewSplit() {
             type="button"
             onClick={addPerson}
             disabled={!name.trim()}
-            className="rounded-2xl bg-white px-5 font-display font-semibold text-leaf disabled:text-muted/50"
+            className="rounded-2xl bg-white px-5 font-display font-semibold text-brand disabled:text-muted/50"
           >
             Add
           </button>

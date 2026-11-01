@@ -7,6 +7,7 @@ export type Category = 'food' | 'drink' | 'alcohol' | 'dessert'
 export type Item = { name: string; amount_paise: number; category: Category }
 
 export type Receipt = {
+  place: string // the restaurant or shop name; '' if the bill doesn't show one
   items: Item[]
   tax_paise: number
   service_charge_paise: number
@@ -45,6 +46,9 @@ export type Split = {
   people: string[]
   question: Question | null
   result: {
+    title: string // the place names of every receipt, e.g. 'Hotel Saravana'; '' if none
+    total_paise: number
+    paid: Record<string, number>
     shares: Record<string, number>
     breakdown: Record<string, Breakdown>
     payments: Payment[]

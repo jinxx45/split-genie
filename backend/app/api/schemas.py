@@ -35,6 +35,7 @@ class ItemIn(BaseModel):
 class ReceiptIn(BaseModel):
     """Answer to "check the items": the receipt, with any fixes."""
 
+    place: str = Field(default="", max_length=100)
     items: list[ItemIn] = Field(min_length=1, max_length=200)
     tax_paise: int = Field(ge=-MAX_AMOUNT_PAISE, le=MAX_AMOUNT_PAISE)  # negative: a discount
     service_charge_paise: int = Field(ge=0, le=MAX_AMOUNT_PAISE)

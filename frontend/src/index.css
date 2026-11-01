@@ -1,15 +1,14 @@
 @import "tailwindcss";
 
-/* Design tokens: steel plate, banana leaf, turmeric. */
+/* Design tokens: steel plate, black ink, a turmeric spark. */
 @theme {
   --color-steel: #e8ecee;
   --color-steel-dark: #d5dbde;
-  --color-leaf: #1e6b45;
-  --color-leaf-dark: #155234;
+  --color-brand: #17181a;
   --color-turmeric: #f2b705;
   --color-turmeric-soft: #fdf3d0;
-  --color-ink: #1b2420;
-  --color-muted: #5b6863;
+  --color-ink: #17181a;
+  --color-muted: #5e6469;
   --color-chilli: #c73a2b;
 
   --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;

@@ -14,7 +14,8 @@ export function Screen(props: {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="flex items-center justify-between px-4 pt-4">
-        <Link to="/" className="font-display text-lg font-bold text-leaf">
+        <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold text-brand">
+          <img src="/favicon.svg" alt="" className="size-7" />
           Split Genie
         </Link>
         {props.step && <Steps current={props.step} />}
@@ -41,7 +42,7 @@ function Steps({ current }: { current: number }) {
         <span
           key={name}
           className={`h-1.5 rounded-full transition-all ${
-            index + 1 === current ? 'w-6 bg-leaf' : index + 1 < current ? 'w-3 bg-leaf/50' : 'w-3 bg-steel-dark'
+            index + 1 === current ? 'w-6 bg-brand' : index + 1 < current ? 'w-3 bg-brand/50' : 'w-3 bg-steel-dark'
           }`}
         />
       ))}
@@ -61,7 +62,7 @@ export function PrimaryButton(props: {
       type={props.type ?? 'button'}
       onClick={props.onClick}
       disabled={props.disabled || props.busy}
-      className="w-full rounded-2xl bg-leaf px-5 py-4 font-display text-lg font-semibold text-white transition active:scale-[0.98] disabled:bg-muted/40"
+      className="w-full rounded-2xl bg-brand px-5 py-4 font-display text-lg font-semibold text-white transition active:scale-[0.98] disabled:bg-muted/40"
     >
       {props.busy ? 'Working on it…' : props.children}
     </button>
@@ -73,7 +74,7 @@ export function SecondaryButton(props: { children: ReactNode; onClick: () => voi
     <button
       type="button"
       onClick={props.onClick}
-      className="w-full rounded-2xl px-5 py-3 font-display font-semibold text-leaf"
+      className="w-full rounded-2xl px-5 py-3 font-display font-semibold text-brand"
     >
       {props.children}
     </button>

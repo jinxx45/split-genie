@@ -67,7 +67,7 @@ export function WhoPaid({ question, people, answer, busy, error }: Props) {
                 onClick={() => setPayer(person)}
                 aria-pressed={payer === person}
                 className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition ${
-                  payer === person ? 'bg-leaf text-white' : 'bg-white'
+                  payer === person ? 'bg-brand text-white' : 'bg-white'
                 }`}
               >
                 <Avatar name={person} color={personColor(people, person)} />
@@ -82,7 +82,7 @@ export function WhoPaid({ question, people, answer, busy, error }: Props) {
       <button
         type="button"
         onClick={() => setSeveral(!several)}
-        className="mt-4 font-display font-semibold text-leaf"
+        className="mt-4 font-display font-semibold text-brand"
       >
         {several ? 'One person paid' : 'More than one person paid'}
       </button>

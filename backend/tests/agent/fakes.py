@@ -4,6 +4,7 @@ from app.agent.receipt import AssignedItem, Correction, LineItem, Receipt, Sugge
 from app.money.split import FULL
 
 DINNER: Receipt = {
+    "place": "Hotel Saravana",
     "items": [
         {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food"},
         {"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol"},
@@ -15,6 +16,7 @@ DINNER: Receipt = {
 }
 
 LUNCH: Receipt = {
+    "place": "Murugan Idli Shop",
     "items": [
         {"name": "Meals", "amount_paise": 36000, "category": "food"},
         {"name": "Filter Coffee x3", "amount_paise": 9000, "category": "drink"},

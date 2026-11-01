@@ -6,9 +6,10 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.graph import build_graph
 from app.api import splits
+from app.api.splits import bill_summary
 from app.main import app
 from tests.agent import fakes
-from tests.agent.fakes import DINNER
+from tests.agent.fakes import DINNER, LUNCH
 
 PEOPLE = ["Arun", "Priya", "Ravi"]
 JPEG = ("bill.jpg", b"\xff\xd8\xff fake jpeg bytes", "image/jpeg")
@@ -69,6 +70,9 @@ def test_a_split_from_photo_to_payments(client):
     assert split["question"] is None
     assert sum(split["result"]["shares"].values()) == 123200
     assert {p["sender"] for p in split["result"]["payments"]} == {"Arun", "Ravi"}
+    assert split["result"]["title"] == "Hotel Saravana"
+    assert split["result"]["total_paise"] == 123200
+    assert split["result"]["paid"] == {"Priya": 123200}
 
 
 def test_opening_the_link_again_shows_the_same_question(client):
@@ -221,3 +225,17 @@ def test_nothing_to_retry_on_a_waiting_split(client):
     split_id = create(client).json()["id"]
 
     assert client.post(f"/api/splits/{split_id}/retry").status_code == 409
+
+
+def test_summary_covers_every_receipt():
+    finished = [
+        {"receipt": DINNER, "paid": {"Priya": 123200}},
+        {"receipt": LUNCH, "paid": {"Priya": 20000, "Arun": 27250}},
+        {"receipt": {**LUNCH, "place": ""}, "paid": {"Arun": 47250}},  # no name printed
+    ]
+
+    assert bill_summary(finished) == {
+        "title": "Hotel Saravana + Murugan Idli Shop",
+        "total_paise": 123200 + 47250 + 47250,
+        "paid": {"Priya": 143200, "Arun": 74500},
+    }

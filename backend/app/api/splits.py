@@ -136,6 +136,7 @@ def describe(graph, split_id: str) -> dict:
     result = None
     if status == "done":
         result = {
+            **bill_summary(values["finished"]),
             "shares": values["shares"],
             "breakdown": values["breakdown"],
             "payments": values["payments"],
@@ -146,6 +147,21 @@ def describe(graph, split_id: str) -> dict:
         "people": values["people"],
         "question": question,
         "result": result,
+    }
+
+
+def bill_summary(finished: list[dict]) -> dict:
+    """What the finished split was for, its total, and who paid, across all its receipts."""
+    # .get: splits saved before receipts had a place still open.
+    places = [done["receipt"].get("place", "") for done in finished]
+    paid: dict[str, int] = {}
+    for done in finished:
+        for person, amount in done["paid"].items():
+            paid[person] = paid.get(person, 0) + amount
+    return {
+        "title": " + ".join(dict.fromkeys(place for place in places if place)),  # unique, in order
+        "total_paise": sum(receipt_total(done["receipt"]) for done in finished),
+        "paid": paid,
     }
 
 
