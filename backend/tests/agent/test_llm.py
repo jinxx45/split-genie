@@ -177,3 +177,10 @@ def test_correct_assignments_lists_items_with_ids_and_people_but_no_prices(monke
 
     assert "0.1 Gulab Jamun: Arun, Priya (half)" in fake.sent
     assert "Priya didn't have dessert" in fake.sent
+
+
+def test_gemini_uses_the_configured_thinking_level(monkeypatch):
+    monkeypatch.setattr(llm.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(llm.settings, "gemini_thinking_level", "minimal")
+
+    assert llm.gemini().thinking_level == "minimal"

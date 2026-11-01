@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""  # empty until you add it to .env; tests don't need it
     gemini_model: str = "gemini-3.8-flash"
+    gemini_thinking_level: str = "low"  # minimal, low, medium or high: higher is slower
     uploads_dir: Path = Path("uploads")  # where receipt photos are saved
     log_level: str = "INFO"  # DEBUG also logs each step as it starts
     langsmith_api_key: str = ""  # set it to send traces to LangSmith; empty = off

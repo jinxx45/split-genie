@@ -13,7 +13,7 @@ from app.agent import llm
 from app.agent.receipt import format_rupees, receipt_total, totals_match
 from app.config import settings
 from app.money.split import FULL
-from app.observability import enable_langsmith_if_configured
+from app.observability import configure_logging, enable_langsmith_if_configured
 
 
 def main() -> None:
@@ -25,6 +25,7 @@ def main() -> None:
 
     if not settings.gemini_api_key:
         sys.exit("No GEMINI_API_KEY found. Add it to backend/.env first.")
+    configure_logging()  # prints how long each Gemini call takes
     if enable_langsmith_if_configured():
         print("LangSmith tracing is on: see the split-genie project at smith.langchain.com")
 
