@@ -18,7 +18,6 @@ PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-h
 - **Money is integer paise**, never floats. Shares must always sum exactly to the bill total.
 - **Mobile first.** Every screen must work one-handed at 375 px wide.
 - **V1 scope only.** Splitting modes (friend review or claiming) and phone OTP are V2. Check the PRD before adding features.
-- **Readability over cleverness.** Code should be easy for a newcomer to Python to read. A comprehension is fine for a simple one-step transform; use a plain `for` loop when it would need more than one `for`/`if`, a lambda, or a complex expression. Give intermediate values descriptive names instead of packing logic into one line.
 
 ### Teaching mode
 
