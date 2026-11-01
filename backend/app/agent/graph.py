@@ -28,6 +28,7 @@ from app.agent.receipt import (
     totals_match,
 )
 from app.money.settle import settle
+from app.observability import AgentLogHandler
 from app.money.split import FULL, Bill, Item, balances, compute_shares
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
@@ -374,4 +375,5 @@ def build_graph(
     builder.add_conditional_edges("approve_split", after_approval)
     builder.add_conditional_edges("apply_correction", after_correction)
 
-    return builder.compile(checkpointer=checkpointer)
+    graph = builder.compile(checkpointer=checkpointer)
+    return graph.with_config(callbacks=[AgentLogHandler()])  # log every step and LLM call
