@@ -1,0 +1,85 @@
+// Types and calls for the Split Genie API. Shapes match backend/app/api/splits.py.
+
+export type Weight = 1 | 2 // 1 = half share, 2 = full share
+export type Weights = Record<string, Weight>
+export type Category = 'food' | 'drink' | 'alcohol' | 'dessert'
+
+export type Item = { name: string; amount_paise: number; category: Category }
+
+export type Receipt = {
+  items: Item[]
+  tax_paise: number
+  service_charge_paise: number
+  printed_total_paise: number
+}
+
+export type ItemShare = { item: string; amount_paise: number; shared_by: number; half: boolean }
+export type Breakdown = { items: ItemShare[]; charges_paise: number; total_paise: number }
+export type Payment = { sender: string; receiver: string; amount_paise: number }
+export type Change = { item: string; before: Weights; after: Weights }
+
+export type ReviewItem = {
+  index: number
+  item: Item
+  suggested: Weights
+  reason: string
+  needs_answer: boolean
+}
+
+export type Question =
+  | { step: 'confirm_items'; receipt: Receipt; totals_match: boolean }
+  | { step: 'review_assignments'; people: string[]; items: ReviewItem[] }
+  | { step: 'payer'; people: string[]; total_paise: number }
+  | {
+      step: 'approve'
+      shares: Record<string, number>
+      breakdown: Record<string, Breakdown>
+      payments: Payment[]
+      changes: Change[]
+      error: string | null
+    }
+
+export type Split = {
+  id: string
+  status: 'waiting' | 'failed' | 'done'
+  people: string[]
+  question: Question | null
+  result: {
+    shares: Record<string, number>
+    breakdown: Record<string, Breakdown>
+    payments: Payment[]
+  } | null
+}
+
+export class ApiError extends Error {}
+
+async function request(path: string, init?: RequestInit): Promise<Split> {
+  const response = await fetch(path, init)
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    // Our own errors carry a sentence in `detail`; framework validation errors carry a list.
+    const message =
+      typeof body.detail === 'string' ? body.detail : 'Please check the details and try again.'
+    throw new ApiError(message)
+  }
+  return body as Split
+}
+
+const json = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+})
+
+export function createSplit(people: string[], note: string, photos: File[]): Promise<Split> {
+  const form = new FormData()
+  people.forEach((person) => form.append('people', person))
+  form.append('note', note)
+  photos.forEach((photo) => form.append('photos', photo))
+  return request('/api/splits', { method: 'POST', body: form })
+}
+
+export const getSplit = (id: string) => request(`/api/splits/${id}`)
+export const answerSplit = (id: string, answer: unknown) =>
+  request(`/api/splits/${id}/answer`, json(answer))
+export const retrySplit = (id: string) => request(`/api/splits/${id}/retry`, { method: 'POST' })

@@ -1,1 +1,64 @@
 @import "tailwindcss";
+
+/* Design tokens: steel plate, banana leaf, turmeric. */
+@theme {
+  --color-steel: #e8ecee;
+  --color-steel-dark: #d5dbde;
+  --color-leaf: #1e6b45;
+  --color-leaf-dark: #155234;
+  --color-turmeric: #f2b705;
+  --color-turmeric-soft: #fdf3d0;
+  --color-ink: #1b2420;
+  --color-muted: #5b6863;
+  --color-chilli: #c73a2b;
+
+  --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --font-body: "Hind", system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-steel);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Amounts line up in columns. */
+.amount {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The receipt: white paper with a torn zig-zag bottom edge. */
+.receipt {
+  --tooth: 9px;
+  background: #fff;
+  padding-bottom: calc(var(--tooth) + 16px);
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% /
+    calc(2 * var(--tooth)) 100%;
+}
+
+/* The one motion moment: the receipt printing while Gemini reads it. */
+@keyframes print {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.printing {
+  animation: print 2.4s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .printing {
+    animation: none;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-turmeric);
+  outline-offset: 2px;
+}
