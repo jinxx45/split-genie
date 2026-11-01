@@ -2,7 +2,7 @@
 
 Flow (see the PRD diagram):
     extract_items -> (totals match? retry up to 2 times) -> confirm_items [pause]
-    -> auto_assign -> ask_assignments [pause, only if some items are unclear]
+    -> auto_assign -> review_assignments [pause; asked again until every item has someone]
     -> ask_payer [pause] -> finish_receipt -> (more receipts? back to extract_items)
     -> compute_shares -> settle
 """
@@ -89,16 +89,29 @@ def auto_assign(state: SplitState) -> dict:
     return {"assignments": assignments}
 
 
-def ask_assignments(state: SplitState) -> dict:
-    """Pause and ask who had each unclear item. Answers: {item index: {person: weight}}."""
-    items = state["receipt"]["items"]
-    questions = [
-        {"index": index, "item": items[index]} for index in unclear_items(state)
-    ]
-    answers = interrupt({"step": "assign", "people": state["people"], "questions": questions})
+def review_assignments(state: SplitState) -> dict:
+    """Pause and show every item with the suggested people, so the user can fix any of them.
+
+    Unclear items (no suggestion) must be answered. The answer lists only what the user
+    changed: {"changes": {item index: {person: weight}}}. No changes means "the suggestions
+    are right". (The answer is wrapped in "changes" because LangGraph treats a bare empty
+    dict sent with `resume` as "no answer".)
+    """
+    unclear = unclear_items(state)
+    items = []
+    for index, item in enumerate(state["receipt"]["items"]):
+        items.append(
+            {
+                "index": index,
+                "item": item,
+                "suggested": state["assignments"][index],
+                "needs_answer": index in unclear,
+            }
+        )
+    answer = interrupt({"step": "review_assignments", "people": state["people"], "items": items})
 
     assignments = list(state["assignments"])
-    for index, weights in answers.items():
+    for index, weights in answer["changes"].items():
         assignments[int(index)] = weights
     return {"assignments": assignments}
 
@@ -171,8 +184,8 @@ def after_extract(state: SplitState) -> str:
     return "extract_items"
 
 
-def after_assign(state: SplitState) -> str:
-    return "ask_assignments" if unclear_items(state) else "ask_payer"
+def after_review(state: SplitState) -> str:
+    return "review_assignments" if unclear_items(state) else "ask_payer"
 
 
 def after_payer(state: SplitState) -> str:
@@ -193,7 +206,7 @@ def build_graph(checkpointer: BaseCheckpointSaver):
     builder.add_node("extract_items", extract_items)
     builder.add_node("confirm_items", confirm_items)
     builder.add_node("auto_assign", auto_assign)
-    builder.add_node("ask_assignments", ask_assignments)
+    builder.add_node("review_assignments", review_assignments)
     builder.add_node("ask_payer", ask_payer)
     builder.add_node("finish_receipt", finish_receipt)
     builder.add_node("compute_shares", compute_shares_node)
@@ -202,8 +215,8 @@ def build_graph(checkpointer: BaseCheckpointSaver):
     builder.add_edge(START, "extract_items")
     builder.add_conditional_edges("extract_items", after_extract)
     builder.add_edge("confirm_items", "auto_assign")
-    builder.add_conditional_edges("auto_assign", after_assign)
-    builder.add_conditional_edges("ask_assignments", after_assign)  # still unclear? ask again
+    builder.add_edge("auto_assign", "review_assignments")
+    builder.add_conditional_edges("review_assignments", after_review)  # still unclear? ask again
     builder.add_conditional_edges("ask_payer", after_payer)
     builder.add_conditional_edges("finish_receipt", after_finish)
     builder.add_edge("compute_shares", "settle")
