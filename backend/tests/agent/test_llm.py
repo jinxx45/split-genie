@@ -65,33 +65,47 @@ def suggestion(index, *shares, reason="from the note"):
     )
 
 
-def test_suggestions_map_names_and_shares():
+ITEMS = [
+    {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food"},
+    {"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol"},
+    {"name": "Filter Coffee x1", "amount_paise": 9500, "category": "drink"},
+]
+
+
+def test_items_the_note_is_about_use_gemini_answer():
     answer = AssignmentSuggestions(
-        items=[
+        exceptions=[
             suggestion(0, ("arun", "full"), ("PRIYA ", "half"), reason="Priya barely ate"),
             suggestion(1, ("Arun", "full"), ("Priya", "full"), reason="Ravi doesn't drink"),
         ]
     )
 
-    result = to_suggestions(answer, PEOPLE, item_count=2)
+    result = to_suggestions(answer, PEOPLE, ITEMS)
 
     assert result[0] == {"weights": {"Arun": FULL, "Priya": HALF}, "reason": "Priya barely ate"}
     assert result[1]["weights"] == {"Arun": FULL, "Priya": FULL}
 
 
-def test_unknown_names_and_missing_items_become_questions():
-    answer = AssignmentSuggestions(items=[suggestion(0, ("Rahul", "full"))])
+def test_items_left_out_get_the_default_food_shared_drinks_asked():
+    result = to_suggestions(AssignmentSuggestions(exceptions=[]), PEOPLE, ITEMS)
 
-    result = to_suggestions(answer, PEOPLE, item_count=2)
+    assert result[0]["weights"] == {"Arun": FULL, "Priya": FULL, "Ravi": FULL}
+    assert result[1]["weights"] == {}  # alcohol: ask
+    assert result[2]["weights"] == {}  # drink: ask
 
-    assert result[0]["weights"] == {}  # Rahul isn't in this split
-    assert result[1]["weights"] == {}  # Gemini skipped item 1
+
+def test_unknown_names_become_questions():
+    answer = AssignmentSuggestions(exceptions=[suggestion(0, ("Rahul", "full"))])
+
+    result = to_suggestions(answer, PEOPLE, ITEMS)
+
+    assert result[0] == {"weights": {}, "reason": "Not sure who had this"}
 
 
-def test_empty_people_list_means_ask_the_user():
-    answer = AssignmentSuggestions(items=[suggestion(0)])
+def test_empty_people_list_means_ask_the_user_with_gemini_reason():
+    answer = AssignmentSuggestions(exceptions=[suggestion(0, reason="Note is unclear")])
 
-    assert to_suggestions(answer, PEOPLE, item_count=1)[0]["weights"] == {}
+    assert to_suggestions(answer, PEOPLE, ITEMS)[0] == {"weights": {}, "reason": "Note is unclear"}
 
 
 class FakeGemini:
@@ -123,7 +137,7 @@ def test_read_receipt_sends_the_photo_and_any_feedback(tmp_path, monkeypatch):
 
 
 def test_suggest_assignments_never_sends_prices(monkeypatch):
-    fake = FakeGemini(AssignmentSuggestions(items=[]))
+    fake = FakeGemini(AssignmentSuggestions(exceptions=[]))
     monkeypatch.setattr(llm, "gemini", lambda: fake)
     items = [{"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol"}]
 

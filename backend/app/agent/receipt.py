@@ -6,6 +6,8 @@ Plain data and small helpers only. No AI in here.
 from decimal import Decimal, InvalidOperation
 from typing import Literal, TypedDict
 
+from app.money.split import FULL
+
 Category = Literal["food", "drink", "alcohol", "dessert"]
 
 
@@ -44,6 +46,14 @@ class Correction(TypedDict):
     receipt: int
     item: int
     weights: dict[str, int]  # never empty: every item must have someone
+
+
+def default_suggestion(item: LineItem, people: list[str]) -> Suggestion:
+    """What we assume when the note says nothing about an item: food and desserts are shared,
+    drinks are usually one person's, so ask."""
+    if item["category"] in ("drink", "alcohol"):
+        return {"weights": {}, "reason": "Drinks are usually one person's: who had it?"}
+    return {"weights": {person: FULL for person in people}, "reason": "Shared by everyone"}
 
 
 def receipt_total(receipt: Receipt) -> int:

@@ -117,3 +117,15 @@ def test_langsmith_is_switched_on_by_a_key(monkeypatch):
     assert enable_langsmith_if_configured() is True
     assert os.environ["LANGSMITH_TRACING"] == "true"
     assert os.environ["LANGSMITH_API_KEY"] == "ls-test-key"
+
+
+@pytest.mark.parametrize(("log_level", "expected"), [("INFO", logging.WARNING), ("DEBUG", logging.NOTSET)])
+def test_chatty_libraries_are_quiet_unless_debugging(monkeypatch, log_level, expected):
+    monkeypatch.setattr(observability.settings, "log_level", log_level)
+    for library in observability.CHATTY_LIBRARIES:
+        monkeypatch.setattr(logging.getLogger(library), "level", logging.NOTSET)
+
+    observability.configure_logging()
+
+    for library in observability.CHATTY_LIBRARIES:
+        assert logging.getLogger(library).level == expected

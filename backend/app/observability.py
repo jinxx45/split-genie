@@ -19,6 +19,9 @@ from app.config import settings
 agent_log = logging.getLogger("split_genie.agent")
 llm_log = logging.getLogger("split_genie.llm")
 
+# Libraries that log every request at INFO. Our own lines already cover those calls.
+CHATTY_LIBRARIES = ("httpx", "google_genai")
+
 
 def configure_logging() -> None:
     """Send our log lines to the terminal. Call once when the app starts."""
@@ -27,6 +30,10 @@ def configure_logging() -> None:
         format="%(asctime)s %(levelname)-5s %(name)s  %(message)s",
         datefmt="%H:%M:%S",
     )
+    if settings.log_level.upper() != "DEBUG":
+        # Hide their routine INFO lines; their warnings and errors still show.
+        for library in CHATTY_LIBRARIES:
+            logging.getLogger(library).setLevel(logging.WARNING)
 
 
 def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> None:

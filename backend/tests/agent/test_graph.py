@@ -156,15 +156,16 @@ def test_two_receipts_with_different_payers_are_settled_together():
     assert len(final["payments"]) <= len(PEOPLE) - 1
 
 
-def test_without_a_note_everyone_shares_everything_and_the_ai_is_not_called():
+def test_without_a_note_the_default_rule_is_used_and_the_ai_is_not_called():
     def must_not_be_called(people, note, items):
         raise AssertionError("no note, so no AI call expected")
 
     graph, config = start(["dinner"], note="  ", suggest=must_not_be_called)
     answer(graph, config, DINNER)
 
-    items = paused_at(graph, config)["items"]
-    assert all(i["suggested"] == {p: FULL for p in PEOPLE} for i in items)
+    biryani, beer, dessert = paused_at(graph, config)["items"]
+    assert biryani["suggested"] == dessert["suggested"] == {p: FULL for p in PEOPLE}
+    assert beer["suggested"] == {} and beer["needs_answer"]
 
 
 def test_split_resumes_from_a_new_graph_using_the_same_checkpointer():

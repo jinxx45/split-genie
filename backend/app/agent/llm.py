@@ -20,6 +20,7 @@ from app.agent.receipt import (
     LineItem,
     Receipt,
     Suggestion,
+    default_suggestion,
     to_paise,
 )
 from app.config import settings
@@ -53,12 +54,16 @@ class PersonShare(BaseModel):
 
 class ItemSuggestion(BaseModel):
     index: int = Field(description="The item's number from the list")
-    people: list[PersonShare] = Field(description="Empty if the note leaves it unclear")
+    people: list[PersonShare] = Field(
+        description="Who had it; empty if the note is about this item but doesn't say who had it"
+    )
     reason: str = Field(description="A short reason for the user, e.g. 'Ravi doesn't drink'")
 
 
 class AssignmentSuggestions(BaseModel):
-    items: list[ItemSuggestion]
+    exceptions: list[ItemSuggestion] = Field(
+        description="Only the items the note says something about. Leave every other item out."
+    )
 
 
 class ItemChange(BaseModel):
@@ -103,30 +108,37 @@ def reading_to_receipt(reading: ReceiptReading) -> Receipt:
     }
 
 
-def to_suggestions(
-    answer: AssignmentSuggestions, people: list[str], item_count: int
-) -> list[Suggestion]:
-    """One suggestion per item, in order. Anything Gemini got wrong becomes "ask the user"."""
+def to_weights(shares: list[PersonShare], people: list[str]) -> dict[str, int]:
+    """Gemini's list of people -> {person: FULL/HALF}. Any name not in the split -> {} (ask)."""
     people_by_lowercase = {person.lower(): person for person in people}
-    answers_by_index = {item.index: item for item in answer.items}
+    weights = {}
+    for share in shares:
+        person = people_by_lowercase.get(share.name.strip().lower())
+        if person is None:
+            return {}
+        weights[person] = FULL if share.share == "full" else HALF
+    return weights
+
+
+def to_suggestions(
+    answer: AssignmentSuggestions, people: list[str], items: list[LineItem]
+) -> list[Suggestion]:
+    """One suggestion per item, in order. Gemini only lists the items the note is about;
+    the rest get the default rule."""
+    exceptions_by_index = {exception.index: exception for exception in answer.exceptions}
 
     suggestions: list[Suggestion] = []
-    for index in range(item_count):
-        item = answers_by_index.get(index)
-        if item is None:
-            suggestions.append({"weights": {}, "reason": "Couldn't tell who had this"})
+    for index, item in enumerate(items):
+        exception = exceptions_by_index.get(index)
+        if exception is None:
+            suggestions.append(default_suggestion(item, people))
             continue
 
-        weights = {}
-        for share in item.people:
-            person = people_by_lowercase.get(share.name.strip().lower())
-            if person is None:  # a name that isn't in this split
-                weights = {}
-                break
-            weights[person] = FULL if share.share == "full" else HALF
-
-        reason = item.reason if weights else "Couldn't tell who had this"
-        suggestions.append({"weights": weights, "reason": reason})
+        weights = to_weights(exception.people, people)
+        if weights or not exception.people:  # valid people, or Gemini itself said "ask"
+            suggestions.append({"weights": weights, "reason": exception.reason})
+        else:  # Gemini named someone who isn't in this split
+            suggestions.append({"weights": {}, "reason": "Not sure who had this"})
     return suggestions
 
 
@@ -134,7 +146,6 @@ def to_corrections(
     answer: CorrectionChanges, people: list[str], items: list[AssignedItem]
 ) -> list[Correction]:
     """Keep only changes that point at a real item and leave it with real people."""
-    people_by_lowercase = {person.lower(): person for person in people}
     known_items = {(item["receipt"], item["item"]) for item in items}
 
     corrections: list[Correction] = []
@@ -142,14 +153,7 @@ def to_corrections(
         if (change.receipt, change.item) not in known_items:
             continue
 
-        weights = {}
-        for share in change.people:
-            person = people_by_lowercase.get(share.name.strip().lower())
-            if person is None:
-                weights = {}
-                break
-            weights[person] = FULL if share.share == "full" else HALF
-
+        weights = to_weights(change.people, people)
         if weights:  # an item can't be left with nobody
             corrections.append({"receipt": change.receipt, "item": change.item, "weights": weights})
     return corrections
@@ -177,19 +181,19 @@ Note from the person splitting it: "{note}"
 Items:
 {items}
 
-For each item, decide who had it, using only the note:
-- If the note says nothing that covers an item, everyone shared it.
-- If the note clearly says someone did not have an item (for example "Ravi doesn't drink"
-  for alcohol, or "Meena left before dessert" for desserts), list everyone else.
-- A preference is not an exclusion. "Doesn't take sugar" or "doesn't like spicy food" does not
-  say whether they had an item; they may have had it made their way.
-- Use "half" for anyone the note says had only a little of an item.
-- If the note is relevant to an item but doesn't say for sure who had it, return an empty list
-  of people for it, so the user is asked. Never guess.
+List only the items the note says something about, and leave every other item out (they are
+handled automatically). For each item you list, say who had it:
+- If the note names who had it ("Madhu had the badam milk"), list just them.
+- If the note clearly says someone did not have it ("Ravi doesn't drink" for alcohol,
+  "Meena left before dessert" for desserts), list everyone else.
+- Use "half" for anyone the note says had only a little of it.
+- If the note is about the item but doesn't say for sure who had it, give an empty list of
+  people, so the user is asked. Never guess.
+- A preference is not an exclusion: "doesn't take sugar" or "doesn't like spicy food" doesn't
+  say whether they had something. Leave such items out unless the note says more.
 - Only use names from the list of people.
 
-Return one entry per item, using the item's number as its index, with a short reason
-written for the user."""
+Use each item's number as its index, and give a short reason written for the user."""
 
 
 CORRECT_PROMPT = """People splitting a bill: {people}
@@ -235,7 +239,7 @@ def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> 
     )
     prompt = ASSIGN_PROMPT.format(people=", ".join(people), note=note, items=numbered_items)
     answer = gemini().with_structured_output(AssignmentSuggestions).invoke(prompt)
-    return to_suggestions(answer, people, len(items))
+    return to_suggestions(answer, people, items)
 
 
 def correct_assignments(

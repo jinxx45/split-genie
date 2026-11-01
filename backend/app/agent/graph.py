@@ -23,13 +23,14 @@ from app.agent.receipt import (
     LineItem,
     Receipt,
     Suggestion,
+    default_suggestion,
     format_rupees,
     receipt_total,
     totals_match,
 )
 from app.money.settle import settle
 from app.observability import AgentLogHandler
-from app.money.split import FULL, Bill, Item, balances, compute_shares
+from app.money.split import Bill, Item, balances, compute_shares
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
 MIN_NOTE_WORDS = 2  # "wrong" alone can't be acted on; "Priya brownie" can
@@ -121,14 +122,13 @@ def confirm_items(state: SplitState) -> dict:
 
 
 def auto_assign(state: SplitState, suggest_assignments: SuggestAssignments) -> dict:
-    """Suggest who had each item. With no note there is nothing to go on, so everyone shares
-    everything (no AI call needed); the user fixes exceptions on the review screen."""
+    """Suggest who had each item. With no note there is nothing for the AI to read, so the
+    default rule (food shared, drinks asked about) is used without an AI call."""
     items = state["receipt"]["items"]
     if state["note"].strip():
         suggestions = suggest_assignments(state["people"], state["note"], items)
     else:
-        everyone = {person: FULL for person in state["people"]}
-        suggestions = [{"weights": everyone, "reason": "Shared by everyone"} for _ in items]
+        suggestions = [default_suggestion(item, state["people"]) for item in items]
 
     return {
         "assignments": [suggestion["weights"] for suggestion in suggestions],
