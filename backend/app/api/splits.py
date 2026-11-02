@@ -223,7 +223,9 @@ def run(graph, split_id: str, graph_input) -> None:
     try:
         graph.invoke(graph_input, config_for(split_id))
     except Exception as error:
-        log_event(api_log, logging.ERROR, "split step failed", split=split_id, error=type(error).__name__)
+        log_event(
+            api_log, logging.ERROR, "split step failed", with_traceback=True, split=split_id, error=type(error).__name__
+        )
         raise HTTPException(
             status_code=502, detail="Something went wrong while working on the bill. Please retry."
         ) from None

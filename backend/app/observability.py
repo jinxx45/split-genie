@@ -36,11 +36,17 @@ def configure_logging() -> None:
             logging.getLogger(library).setLevel(logging.WARNING)
 
 
-def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> None:
+def log_event(
+    logger: logging.Logger, level: int, event: str, *, with_traceback: bool = False, **fields: Any
+) -> None:
     """log_event(agent_log, INFO, "node finished", node="settle", ms=12)
-    -> "node finished node=settle ms=12"."""
+    -> "node finished node=settle ms=12".
+
+    with_traceback=True (only inside an `except` block) also logs where the error happened, so
+    an unexpected failure can be fixed from the logs alone.
+    """
     details = " ".join(f"{key}={value}" for key, value in fields.items() if value is not None)
-    logger.log(level, f"{event} {details}".strip())
+    logger.log(level, f"{event} {details}".strip(), exc_info=with_traceback)
 
 
 def enable_langsmith_if_configured() -> bool:

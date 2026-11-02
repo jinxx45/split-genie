@@ -3,6 +3,8 @@ import time
 import uuid
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.api import auth, splits
 from app.observability import configure_logging, elapsed_ms, enable_langsmith_if_configured, log_event
@@ -28,18 +30,23 @@ async def log_requests(request: Request, call_next):
     started = time.perf_counter()
     try:
         response = await call_next(request)
-    except Exception as error:
+    except Exception as error:  # a bug: anything expected is already an HTTPException
         log_event(
             api_log,
             logging.ERROR,
             "request failed",
+            with_traceback=True,
             id=request_id,
             method=request.method,
             path=request.url.path,
             ms=elapsed_ms(started),
             error=type(error).__name__,
         )
-        raise
+        # Always JSON, with the id, so the app can show a reference that matches this log line.
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": f"Something went wrong on our side (ref {request_id}). Please try again."},
+        )
 
     response.headers["X-Request-ID"] = request_id
     log_event(
@@ -53,6 +60,15 @@ async def log_requests(request: Request, call_next):
         ms=elapsed_ms(started),
     )
     return response
+
+
+@app.exception_handler(RequestValidationError)
+async def readable_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
+    """FastAPI's own checks (a missing form field, a wrong type) return a list of problems by
+    default. Send the first one as a sentence, like every other error, so the app can show it."""
+    first = error.errors()[0]
+    where = ".".join(str(part) for part in first["loc"] if part not in ("body", "query", "path"))
+    return JSONResponse(status_code=422, content={"detail": f"{where}: {first['msg']}" if where else first["msg"]})
 
 
 @app.get("/api/health")
