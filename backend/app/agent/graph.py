@@ -20,12 +20,13 @@ from langgraph.types import interrupt
 from app.agent.receipt import (
     AssignedItem,
     Assignment,
-    Correction,
+    AssignmentPlan,
+    CorrectionPlan,
     LineItem,
     Receipt,
-    Suggestion,
     assignment_problem,
     default_suggestion,
+    eat_less,
     format_rupees,
     item_label,
     receipt_total,
@@ -43,11 +44,13 @@ MAX_NOTE_LENGTH = 500
 ReadReceipt = Callable[[str, str | None], Receipt]
 """(receipt id, feedback about the previous misread or None) -> the receipt as read."""
 
-SuggestAssignments = Callable[[list[str], str, list[LineItem]], list[Suggestion]]
-"""(people, the splitter's note, items) -> one suggestion per item, in the same order."""
+SuggestAssignments = Callable[[list[str], str, list[LineItem]], AssignmentPlan]
+"""(people, the splitter's note, items) -> one suggestion per item in the same order, and who
+ate less overall."""
 
-CorrectAssignments = Callable[[list[str], list[AssignedItem], str], list[Correction]]
-"""(people, every finished item and who had it, the user's note) -> valid fixes; [] if none."""
+CorrectAssignments = Callable[[list[str], list[AssignedItem], str], CorrectionPlan]
+"""(people, every finished item and who had it, the user's note) -> valid fixes and anyone who
+ate less overall; both empty if the note can't be used."""
 
 
 class FinishedReceipt(TypedDict):
@@ -65,6 +68,7 @@ class SplitState(TypedDict):
     receipt: Receipt | None
     assignments: list[Assignment]  # one per item; empty weights = not decided
     reasons: list[str]  # one per item: why it was assigned that way
+    light_eaters: list[str]  # people who ate less: a half share of shared food on every receipt
     paid: dict[str, int]  # who paid the current receipt, in paise
     finished: list[FinishedReceipt]
     shares: dict[str, int]
@@ -88,6 +92,7 @@ def new_split(people: list[str], note: str, receipt_ids: list[str]) -> SplitStat
         "receipt": None,
         "assignments": [],
         "reasons": [],
+        "light_eaters": [],
         "paid": {},
         "finished": [],
         "shares": {},
@@ -130,19 +135,26 @@ def confirm_items(state: SplitState) -> dict:
 
 def auto_assign(state: SplitState, suggest_assignments: SuggestAssignments) -> dict:
     """Suggest who had each item. With no note there is nothing for the AI to read, so the
-    default rule (food shared, drinks asked about) is used without an AI call."""
+    default rule (food shared, drinks asked about) is used without an AI call.
+
+    Light eaters (from the note, or chosen on an earlier receipt) then get a half share of
+    shared food. That rule is plain Python, so it is applied the same way to every item.
+    """
     items = state["receipt"]["items"]
     if state["note"].strip():
-        suggestions = suggest_assignments(state["people"], state["note"], items)
+        plan = suggest_assignments(state["people"], state["note"], items)
     else:
-        suggestions = [default_suggestion(item, state["people"]) for item in items]
+        plan = {"suggestions": [default_suggestion(item, state["people"]) for item in items], "light_eaters": []}
 
+    light_eaters = in_split_order(state["people"], state["light_eaters"] + plan["light_eaters"])
+    assignments = [
+        eat_less(item, {"weights": suggestion["weights"], "by_count": suggestion["by_count"]}, light_eaters)
+        for item, suggestion in zip(items, plan["suggestions"])
+    ]
     return {
-        "assignments": [
-            {"weights": suggestion["weights"], "by_count": suggestion["by_count"]}
-            for suggestion in suggestions
-        ],
-        "reasons": [suggestion["reason"] for suggestion in suggestions],
+        "assignments": assignments,
+        "reasons": [suggestion["reason"] for suggestion in plan["suggestions"]],
+        "light_eaters": light_eaters,
     }
 
 
@@ -150,8 +162,9 @@ def review_assignments(state: SplitState) -> dict:
     """Pause and show every item with the suggested people, so the user can fix any of them.
 
     Unclear items (no one yet, or counts that don't add up) must be answered. The answer lists
-    only what the user changed: {"changes": {item index: assignment}}. No changes means "the
-    suggestions are right". (The answer is wrapped in "changes" because LangGraph treats a bare empty
+    only what the user changed: {"changes": {item index: assignment}}, plus "light_eaters" if
+    the user changed who ate less (the screen has already applied that to the items). No
+    changes means "the suggestions are right". (The answer is wrapped in "changes" because LangGraph treats a bare empty
     dict sent with `resume` as "no answer".)
     """
     unclear = unclear_items(state)
@@ -166,12 +179,19 @@ def review_assignments(state: SplitState) -> dict:
                 "needs_answer": index in unclear,
             }
         )
-    answer = interrupt({"step": "review_assignments", "people": state["people"], "items": items})
+    answer = interrupt(
+        {
+            "step": "review_assignments",
+            "people": state["people"],
+            "items": items,
+            "light_eaters": state["light_eaters"],
+        }
+    )
 
     assignments = list(state["assignments"])
     for index, assignment in answer["changes"].items():
         assignments[int(index)] = assignment
-    return {"assignments": assignments}
+    return {"assignments": assignments, "light_eaters": answer.get("light_eaters", state["light_eaters"])}
 
 
 def ask_payer(state: SplitState) -> dict:
@@ -253,12 +273,12 @@ def approve_split(state: SplitState) -> dict:
 
 
 def apply_correction(state: SplitState, correct_assignments: CorrectAssignments) -> dict:
-    """Turn the user's note into changes to who had what. If nothing usable comes out
-    (gibberish, or a note about something other than items), ask again with a hint."""
-    corrections = correct_assignments(
-        state["people"], assigned_items(state["finished"]), state["correction_note"]
-    )
-    if not corrections:
+    """Turn the user's note into changes to who had what, including anyone who ate less overall.
+    If nothing usable comes out (gibberish, or a note about something other than items), ask
+    again with a hint."""
+    plan = correct_assignments(state["people"], assigned_items(state["finished"]), state["correction_note"])
+    new_light_eaters = [person for person in plan["light_eaters"] if person not in state["light_eaters"]]
+    if not plan["corrections"] and not new_light_eaters:
         return {
             "approval_error": (
                 "Couldn't match that to any item. Name the person and the item, for example "
@@ -269,17 +289,29 @@ def apply_correction(state: SplitState, correct_assignments: CorrectAssignments)
     # Copy before changing: nodes return new values instead of editing the state in place.
     finished = [dict(done, assignments=list(done["assignments"])) for done in state["finished"]]
     changes = []
-    for correction in corrections:
-        done = finished[correction["receipt"]]
-        changes.append(
-            {
-                "item": item_label(done["receipt"]["items"][correction["item"]]),
-                "before": done["assignments"][correction["item"]],
-                "after": {"weights": correction["weights"], "by_count": correction["by_count"]},
-            }
-        )
-        done["assignments"][correction["item"]] = changes[-1]["after"]
-    return {"finished": finished, "approval_error": None, "last_changes": changes}
+
+    def change(done: FinishedReceipt, index: int, after: Assignment) -> None:
+        """Record one item's before and after for the approval screen, then apply it."""
+        item = done["receipt"]["items"][index]
+        changes.append({"item": item_label(item), "before": done["assignments"][index], "after": after})
+        done["assignments"][index] = after
+
+    for correction in plan["corrections"]:
+        after = {"weights": correction["weights"], "by_count": correction["by_count"]}
+        change(finished[correction["receipt"]], correction["item"], after)
+
+    for done in finished:
+        for index, item in enumerate(done["receipt"]["items"]):
+            after = eat_less(item, done["assignments"][index], new_light_eaters)
+            if after != done["assignments"][index]:
+                change(done, index, after)
+
+    return {
+        "finished": finished,
+        "approval_error": None,
+        "last_changes": changes,
+        "light_eaters": in_split_order(state["people"], state["light_eaters"] + new_light_eaters),
+    }
 
 
 # --- Plain helpers ---
@@ -304,6 +336,11 @@ def check_approval(answer: object) -> str | None:
     if len(note) > MAX_NOTE_LENGTH:
         return f"Please keep the note under {MAX_NOTE_LENGTH} characters."
     return None
+
+
+def in_split_order(people: list[str], names: list[str]) -> list[str]:
+    """The people named, once each, in the order they were added to the split."""
+    return [person for person in people if person in names]
 
 
 def to_bill(done: FinishedReceipt) -> Bill:

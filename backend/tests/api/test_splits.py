@@ -244,3 +244,13 @@ def test_summary_covers_every_receipt():
         "total_paise": 123200 + 47250 + 47250,
         "paid": {"Priya": 143200, "Arun": 74500},
     }
+
+
+def test_light_eaters_must_be_in_the_split(client):
+    split_id = create(client).json()["id"]
+    answer(client, split_id, DINNER)
+
+    response = answer(client, split_id, {"changes": {}, "light_eaters": ["Rahul"]})
+
+    assert response.status_code == 422
+    assert "Not in this split: Rahul" in response.json()["detail"]

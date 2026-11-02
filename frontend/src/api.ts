@@ -38,7 +38,7 @@ export type ReviewItem = {
 
 export type Question =
   | { step: 'confirm_items'; receipt: Receipt; totals_match: boolean }
-  | { step: 'review_assignments'; people: string[]; items: ReviewItem[] }
+  | { step: 'review_assignments'; people: string[]; items: ReviewItem[]; light_eaters: string[] }
   | { step: 'payer'; people: string[]; total_paise: number }
   | {
       step: 'approve'

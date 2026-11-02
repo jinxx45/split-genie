@@ -192,7 +192,9 @@ def checked_answer(question: dict, body: dict, values: dict) -> Any:
             review = ReviewIn.model_validate(body)
             check_review(review, values["people"], values["receipt"]["items"])
             changes = {str(index): assignment.model_dump() for index, assignment in review.changes.items()}
-            return {"changes": changes}
+            if review.light_eaters is None:
+                return {"changes": changes}
+            return {"changes": changes, "light_eaters": review.light_eaters}
 
         if step == "payer":
             payer = PayerIn.model_validate(body)

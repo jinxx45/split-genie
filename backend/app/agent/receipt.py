@@ -45,6 +45,13 @@ class Suggestion(Assignment):
     reason: str  # shown to the user on the review screen
 
 
+class AssignmentPlan(TypedDict):
+    """What the agent suggests for a receipt: one suggestion per item, and who ate less overall."""
+
+    suggestions: list[Suggestion]
+    light_eaters: list[str]
+
+
 class AssignedItem(Assignment):
     """An item from a finished receipt and who had it, as shown when correcting the split."""
 
@@ -61,6 +68,13 @@ class Correction(Assignment):
     item: int
 
 
+class CorrectionPlan(TypedDict):
+    """What a correction note asks for: fixes to items, and anyone who ate less overall."""
+
+    corrections: list[Correction]
+    light_eaters: list[str]
+
+
 def default_suggestion(item: LineItem, people: list[str]) -> Suggestion:
     """What we assume when the note says nothing about an item: food and desserts are shared,
     drinks are usually one person's, so ask (by count when several were ordered)."""
@@ -69,6 +83,18 @@ def default_suggestion(item: LineItem, people: list[str]) -> Suggestion:
             return {"weights": {}, "by_count": True, "reason": "Drinks are usually one each: who had how many?"}
         return {"weights": {}, "by_count": False, "reason": "Drinks are usually one person's: who had it?"}
     return {"weights": {person: FULL for person in people}, "by_count": False, "reason": "Shared by everyone"}
+
+
+def eat_less(item: LineItem, assignment: Assignment, light_eaters: list[str]) -> Assignment:
+    """Light eaters pay a half share of shared food and desserts. Drinks, and items split by
+    count ("who had how many"), are about what each person actually had, so they stay as they are."""
+    if assignment["by_count"] or item["category"] not in ("food", "dessert"):
+        return assignment
+    weights = {
+        person: HALF if person in light_eaters and weight == FULL else weight
+        for person, weight in assignment["weights"].items()
+    }
+    return {"weights": weights, "by_count": False}
 
 
 def assignment_problem(assignment: Assignment, quantity: int) -> str | None:

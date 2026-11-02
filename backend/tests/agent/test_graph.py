@@ -2,7 +2,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from app.agent.graph import build_graph, new_split
-from app.money.split import FULL
+from app.money.split import FULL, HALF
 from tests.agent import fakes
 from tests.agent.fakes import DINNER, LUNCH
 
@@ -284,3 +284,46 @@ def test_approval_after_a_correction_lists_what_changed():
             "after": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False},
         }
     ]
+
+
+# --- Light eaters ---
+
+SHARED_LIGHT_PRIYA = {"weights": {"arun": FULL, "priya": HALF, "ravi": FULL}, "by_count": False}
+
+
+def test_a_light_eater_from_the_note_gets_half_of_shared_food_but_not_drinks():
+    graph, config = start(["dinner"], note="priya didn't eat much")
+    answer(graph, config, DINNER)
+
+    question = paused_at(graph, config)
+    biryani, beer, dessert = question["items"]
+    assert question["light_eaters"] == ["priya"]
+    assert biryani["suggested"] == dessert["suggested"] == SHARED_LIGHT_PRIYA
+    assert beer["suggested"]["weights"] == {}  # drinks are about who had them: still asked
+
+
+def test_light_eaters_chosen_on_review_carry_over_to_the_next_receipt():
+    graph, config = start(["dinner", "lunch"])
+    answer(graph, config, DINNER)
+    beer = {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}
+    answer(graph, config, {"changes": {"1": beer}, "light_eaters": ["priya"]})
+    answer(graph, config, {"priya": 123200})
+
+    answer(graph, config, LUNCH)
+
+    question = paused_at(graph, config)
+    meals, coffee = question["items"]
+    assert question["light_eaters"] == ["priya"]
+    assert meals["suggested"] == SHARED_LIGHT_PRIYA
+    assert coffee["suggested"]["weights"] == {"arun": FULL, "priya": FULL, "ravi": FULL}  # a drink
+
+
+def test_a_correction_saying_someone_ate_less_halves_their_shared_food():
+    graph, config = run_dinner_to_approval()
+
+    answer(graph, config, {"approved": False, "note": "ravi didn't eat much"})
+
+    changed = paused_at(graph, config)["changes"]
+    assert [change["item"] for change in changed] == ["Chicken Biryani", "Gulab Jamun"]
+    assert changed[0]["after"]["weights"] == {"arun": FULL, "priya": FULL, "ravi": HALF}
+    assert graph.get_state(config).values["light_eaters"] == ["ravi"]

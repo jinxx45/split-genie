@@ -1,9 +1,10 @@
 // Step 2: who had what. Every item, with the people Split Genie suggests.
 // Shared items: tap a name to change their share. Items ordered several times ("Cold Coffee x3")
 // can instead be split by count: who had how many. Unfinished items are highlighted.
+// At the top, "Anyone eat less?" gives a person half a share of every shared food item in one tap.
 
 import { useState } from 'react'
-import type { Assignment, Question, ReviewItem } from '../api'
+import type { Assignment, Item, Question, ReviewItem } from '../api'
 import { itemLabel } from '../items'
 import { formatRupees } from '../money'
 import type { StepProps } from '../pages/SplitPage'
@@ -14,6 +15,13 @@ type Props = StepProps<Extract<Question, { step: 'review_assignments' }>>
 
 export function ReviewItems({ question, people, answer, busy, error }: Props) {
   const [assignments, setAssignments] = useState<Assignment[]>(question.items.map((entry) => entry.suggested))
+  const [lightEaters, setLightEaters] = useState<string[]>(question.light_eaters)
+
+  function toggleLightEater(person: string) {
+    const eatsLess = !lightEaters.includes(person)
+    setLightEaters(people.filter((p) => (p === person ? eatsLess : lightEaters.includes(p))))
+    setAssignments(assignments.map((assignment, i) => eatLess(question.items[i].item, assignment, person, eatsLess)))
+  }
 
   function update(index: number, assignment: Assignment) {
     setAssignments(assignments.map((current, i) => (i === index ? assignment : current)))
@@ -27,7 +35,8 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
     question.items.forEach((entry, index) => {
       if (!sameAssignment(entry.suggested, assignments[index])) changes[entry.index] = assignments[index]
     })
-    answer({ changes })
+    const lightEatersChanged = lightEaters.join() !== question.light_eaters.join()
+    answer(lightEatersChanged ? { changes, light_eaters: lightEaters } : { changes })
   }
 
   return (
@@ -40,6 +49,7 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
         </PrimaryButton>
       }
     >
+      <LightEaters people={people} lightEaters={lightEaters} onToggle={toggleLightEater} />
       <p className="mb-5 text-muted">Tap a name: once for a full share, again for half, again to remove.</p>
       <ul className="space-y-3">
         {question.items.map((entry, index) => (
@@ -54,6 +64,40 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
       </ul>
       {error && <ErrorText>{error}</ErrorText>}
     </Screen>
+  )
+}
+
+/** One tap per person who ate less than the others: they pay half a share of shared food. */
+function LightEaters(props: { people: string[]; lightEaters: string[]; onToggle: (person: string) => void }) {
+  const { people, lightEaters, onToggle } = props
+  return (
+    <section className="mb-6 rounded-2xl bg-white p-4">
+      <h2 className="font-display text-lg font-semibold">Anyone eat less?</h2>
+      <p className="text-sm text-muted">They pay half a share of shared food. Drinks stay as they are.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {people.map((person) => {
+          const color = personColor(people, person)
+          const on = lightEaters.includes(person)
+          return (
+            <button
+              key={person}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(person)}
+              className="rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition active:scale-95"
+              style={{
+                borderColor: on ? color : 'var(--color-steel-dark)',
+                background: on ? `linear-gradient(90deg, ${color}66 50%, #fff 50%)` : '#fff',
+                color: on ? 'var(--color-ink)' : 'var(--color-muted)',
+              }}
+            >
+              {person}
+              {on && <span className="ml-1">½</span>}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -183,6 +227,16 @@ function StepButton(props: { label: string; disabled: boolean; onClick: () => vo
       {props.children}
     </button>
   )
+}
+
+/** The same rule as eat_less in the backend: on shared food and desserts, a light eater's full
+ * share becomes half (or, when they're no longer a light eater, half goes back to full). */
+function eatLess(item: Item, assignment: Assignment, person: string, eatsLess: boolean): Assignment {
+  const [from, to] = eatsLess ? [2, 1] : [1, 2]
+  if (assignment.by_count || !['food', 'dessert'].includes(item.category) || assignment.weights[person] !== from) {
+    return assignment
+  }
+  return { ...assignment, weights: { ...assignment.weights, [person]: to } }
 }
 
 /** Someone has the item and, when split by count, the counts add up to how many were ordered.

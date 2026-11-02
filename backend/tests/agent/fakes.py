@@ -1,6 +1,6 @@
 """Stand-ins for the AI steps, so graph tests run without Gemini or an API key."""
 
-from app.agent.receipt import AssignedItem, Correction, LineItem, Receipt, Suggestion
+from app.agent.receipt import AssignedItem, AssignmentPlan, Correction, CorrectionPlan, LineItem, Receipt, Suggestion
 from app.money.split import FULL
 
 DINNER: Receipt = {
@@ -47,7 +47,14 @@ def read_receipt(receipt_id: str, feedback: str | None) -> Receipt:
     return DINNER
 
 
-def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> list[Suggestion]:
+def light_eaters_in(note: str, people: list[str]) -> list[str]:
+    """Understands "<name> didn't eat much"."""
+    if "eat much" not in note.lower():
+        return []
+    return [person for person in people if person.lower() in note.lower()]
+
+
+def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> AssignmentPlan:
     """Food and desserts go to everyone; drinks with alcohol are left for the user."""
     suggestions: list[Suggestion] = []
     for item in items:
@@ -55,13 +62,14 @@ def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> 
             suggestions.append({"weights": {}, "by_count": False, "reason": "Not sure who drank"})
         else:
             suggestions.append({"weights": {p: FULL for p in people}, "by_count": False, "reason": "Shared"})
-    return suggestions
+    return {"suggestions": suggestions, "light_eaters": light_eaters_in(note, people)}
 
 
-def correct_assignments(people: list[str], items: list[AssignedItem], note: str) -> list[Correction]:
-    """Understands one kind of note: "<name> didn't have dessert". Anything else: no changes."""
+def correct_assignments(people: list[str], items: list[AssignedItem], note: str) -> CorrectionPlan:
+    """Understands "<name> didn't have dessert" and "<name> didn't eat much". Anything else: nothing."""
+    light_eaters = light_eaters_in(note, people)
     if "dessert" not in note.lower():
-        return []
+        return {"corrections": [], "light_eaters": light_eaters}
     named = [person for person in people if person.lower() in note.lower()]
     corrections: list[Correction] = []
     for item in items:
@@ -70,4 +78,4 @@ def correct_assignments(people: list[str], items: list[AssignedItem], note: str)
             corrections.append(
                 {"receipt": item["receipt"], "item": item["item"], "weights": weights, "by_count": False}
             )
-    return corrections
+    return {"corrections": corrections, "light_eaters": light_eaters}

@@ -12,6 +12,7 @@ from app.agent.llm import (
     ReceiptReading,
     reading_to_receipt,
     to_corrections,
+    to_people,
     to_suggestions,
 )
 from app.agent.receipt import totals_match
@@ -232,3 +233,7 @@ def test_correct_assignments_lists_items_with_ids_and_people_but_no_prices(monke
     assert "0.1 Gulab Jamun (quantity 1): Arun, Priya (half)" in fake.sent
     assert "0.2 Cold Coffee (quantity 3): Arun had 2, Priya had 1" in fake.sent
     assert "Priya didn't have dessert" in fake.sent
+
+
+def test_to_people_matches_names_in_the_split_in_its_order():
+    assert to_people(["ravi ", "ARUN", "Rahul"], PEOPLE) == ["Arun", "Ravi"]

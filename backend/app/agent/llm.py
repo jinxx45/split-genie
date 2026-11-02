@@ -16,8 +16,10 @@ from pydantic import BaseModel, Field
 from app.agent.receipt import (
     AssignedItem,
     Assignment,
+    AssignmentPlan,
     Category,
     Correction,
+    CorrectionPlan,
     LineItem,
     Receipt,
     Suggestion,
@@ -74,6 +76,10 @@ class AssignmentSuggestions(BaseModel):
     exceptions: list[ItemSuggestion] = Field(
         description="Only the items the note says something about. Leave every other item out."
     )
+    light_eaters: list[str] = Field(
+        default_factory=list,
+        description="People the note says ate less than the others overall, e.g. 'Prianka didn't eat much'",
+    )
 
 
 class ItemChange(BaseModel):
@@ -84,6 +90,10 @@ class ItemChange(BaseModel):
 
 class CorrectionChanges(BaseModel):
     changes: list[ItemChange] = Field(description="Empty if the note doesn't clearly ask for a change")
+    light_eaters: list[str] = Field(
+        default_factory=list,
+        description="People the note says ate less than the others overall, e.g. 'Prianka didn't eat much'",
+    )
 
 
 # --- Turning Gemini's answers into our own types. Pure functions, tested without the AI. ---
@@ -142,6 +152,13 @@ def to_assignment(shares: list[PersonShare], people: list[str]) -> Assignment:
         elif share.count > 0:
             weights[person] = share.count
     return {"weights": weights, "by_count": by_count}
+
+
+def to_people(names: list[str], people: list[str]) -> list[str]:
+    """Names Gemini gave -> the matching people in the split, in the split's order. Any name
+    not in the split is dropped."""
+    wanted = {name.strip().lower() for name in names}
+    return [person for person in people if person.lower() in wanted]
 
 
 def to_suggestions(
@@ -221,6 +238,9 @@ handled automatically). For each item you list, say who had it:
   is asked about the rest.
 - If the note is about the item but doesn't say for sure who had it, give an empty list of
   people, so the user is asked. Never guess.
+- If the note says someone ate less than the others overall ("Prianka didn't eat much"), put
+  them in light_eaters and don't list items just for that. Light eaters pay a half share of
+  shared food automatically.
 - A preference is not an exclusion: "doesn't take sugar" or "doesn't like spicy food" doesn't
   say whether they had something. Leave such items out unless the note says more.
 - Only use names from the list of people.
@@ -239,6 +259,8 @@ Return the changes the note asks for. For each changed item, give its receipt an
 and the full list of people who had it after the change (not just the people who changed).
 - If the note says how many of an item someone had, give a count for everyone who had it,
   adding up to the item's quantity.
+- If the note says someone ate less than the others overall ("Prianka didn't eat much"), put
+  them in light_eaters instead of changing items.
 - Only change items the note clearly refers to.
 - Only use names from the list of people.
 - If the note is unclear, unrelated to who had which item, or not a real sentence, return no
@@ -267,19 +289,20 @@ def read_receipt(receipt_id: str, feedback: str | None) -> Receipt:
     return reading_to_receipt(reading)
 
 
-def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> list[Suggestion]:
+def suggest_assignments(people: list[str], note: str, items: list[LineItem]) -> AssignmentPlan:
     numbered_items = "\n".join(
         f"{index}. {item['name']} ({item['category']}, quantity {item['quantity']})"
         for index, item in enumerate(items)
     )
     prompt = ASSIGN_PROMPT.format(people=", ".join(people), note=note, items=numbered_items)
     answer = gemini().with_structured_output(AssignmentSuggestions).invoke(prompt)
-    return to_suggestions(answer, people, items)
+    return {
+        "suggestions": to_suggestions(answer, people, items),
+        "light_eaters": to_people(answer.light_eaters, people),
+    }
 
 
-def correct_assignments(
-    people: list[str], items: list[AssignedItem], note: str
-) -> list[Correction]:
+def correct_assignments(people: list[str], items: list[AssignedItem], note: str) -> CorrectionPlan:
     listed_items = "\n".join(
         f"{item['receipt']}.{item['item']} {item['name']} (quantity {item['quantity']}): "
         f"{describe_people(item)}"
@@ -287,7 +310,10 @@ def correct_assignments(
     )
     prompt = CORRECT_PROMPT.format(people=", ".join(people), items=listed_items, note=note)
     answer = gemini().with_structured_output(CorrectionChanges).invoke(prompt)
-    return to_corrections(answer, people, items)
+    return {
+        "corrections": to_corrections(answer, people, items),
+        "light_eaters": to_people(answer.light_eaters, people),
+    }
 
 
 def describe_people(assignment: Assignment) -> str:

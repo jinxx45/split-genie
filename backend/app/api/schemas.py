@@ -55,6 +55,7 @@ class ReviewIn(BaseModel):
     """Answer to "who had what": only the items the user changed."""
 
     changes: dict[int, AssignmentIn]  # item index -> who had it
+    light_eaters: list[str] | None = None  # who ate less; None: unchanged
 
 
 class PayerIn(BaseModel):
@@ -89,6 +90,9 @@ def clean_people(names: list[str]) -> list[str]:
 
 
 def check_review(review: ReviewIn, people: list[str], items: list[LineItem]) -> None:
+    unknown = [name for name in review.light_eaters or [] if name not in people]
+    if unknown:
+        raise reject(f"Not in this split: {', '.join(unknown)}.")
     for index, assignment in review.changes.items():
         if not 0 <= index < len(items):
             raise reject(f"There is no item {index}.")

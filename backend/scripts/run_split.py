@@ -98,6 +98,8 @@ def ask_confirm(question: dict) -> dict:
 
 def ask_review(question: dict, people: list[str]) -> dict:
     print("\n── Who had what ──")
+    if question["light_eaters"]:
+        print(f"  Ate less (half a share of shared food): {', '.join(question['light_eaters'])}")
     for entry in question["items"]:
         who = llm.describe_people(entry["suggested"]) or "❓"
         flag = "  ← please answer" if entry["needs_answer"] else ""
