@@ -20,3 +20,5 @@ uploads/
 *.db-shm
 *.db-wal
 backend/static/
+.neon
+node_modules/
