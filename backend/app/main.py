@@ -1,13 +1,10 @@
 import logging
-import secrets
 import time
 import uuid
 
 from fastapi import FastAPI, Request
-from starlette.middleware.sessions import SessionMiddleware
 
 from app.api import auth, splits
-from app.config import settings
 from app.observability import configure_logging, elapsed_ms, enable_langsmith_if_configured, log_event
 
 configure_logging()
@@ -18,16 +15,6 @@ api_log = logging.getLogger("split_genie.api")
 app = FastAPI(title="Split Genie API")
 app.include_router(auth.router)
 app.include_router(splits.router)
-
-if not settings.session_secret:
-    api_log.warning("SESSION_SECRET is not set: everyone is signed out when the server restarts")
-# The sign-in cookie: signed so it can't be forged, unreadable to page scripts (httponly by default).
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.session_secret or secrets.token_hex(32),
-    same_site="lax",
-    max_age=60 * 60 * 24 * 30,  # 30 days
-)
 
 
 @app.middleware("http")

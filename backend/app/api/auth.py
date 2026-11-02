@@ -7,11 +7,12 @@ with Google's public keys, then remember the user in a signed session cookie.
 from collections.abc import Callable
 from functools import lru_cache
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
+from app.api import session
 from app.api.accounts import AccountStore, User
 from app.api.schemas import MAX_NAME_LENGTH, UPI_ID_PATTERN
 from app.config import settings
@@ -38,7 +39,7 @@ def get_accounts() -> AccountStore:
 
 def current_user(request: Request, accounts: AccountStore = Depends(get_accounts)) -> User | None:
     """The signed-in user, or None. Signing in is optional, so most endpoints accept None."""
-    user_id = request.session.get("user_id")
+    user_id = session.read(request.cookies.get(session.COOKIE_NAME))
     return accounts.user(user_id) if user_id else None
 
 
@@ -76,7 +77,7 @@ def auth_config() -> dict:
 @router.post("/auth/google")
 def sign_in(
     body: GoogleSignInIn,
-    request: Request,
+    response: Response,
     accounts: AccountStore = Depends(get_accounts),
     verify: VerifyToken = Depends(get_verifier),
 ) -> dict:
@@ -91,13 +92,19 @@ def sign_in(
 
     name = claims.get("given_name") or claims.get("name") or claims["email"].split("@")[0]
     user = accounts.sign_in(claims["sub"], claims["email"], name.strip()[:MAX_NAME_LENGTH])
-    request.session["user_id"] = user.id
+    response.set_cookie(
+        session.COOKIE_NAME,
+        session.sign(user.id),
+        max_age=session.MAX_AGE_SECONDS,
+        httponly=True,  # page scripts can't read it
+        samesite="lax",  # not sent when another site posts to ours
+    )
     return describe_me(user, accounts)
 
 
 @router.post("/auth/sign-out")
-def sign_out(request: Request) -> dict:
-    request.session.clear()
+def sign_out(response: Response) -> dict:
+    response.delete_cookie(session.COOKIE_NAME)
     return {"user": None, "friends": []}
 
 
