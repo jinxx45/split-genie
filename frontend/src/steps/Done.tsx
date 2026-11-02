@@ -6,9 +6,11 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { saveFriendUpiId, saveMyUpiId } from '../api'
 import type { Payment, PaymentMark, Split } from '../api'
 import { formatRupees, toRupeesText } from '../money'
 import { ErrorText, Paper, Screen } from '../ui'
+import { useMe } from '../useMe'
 import { BreakdownList, BreakdownPaper, Payments } from './Summary'
 
 type Result = NonNullable<Split['result']>
@@ -32,7 +34,25 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
   const waiting = result.payments.filter((payment) => !payment.marked_paid_by)
   const receivers = [...new Set(waiting.map((payment) => payment.receiver))]
   const [typedIds, setTypedIds] = useState<Record<string, string>>({})
-  const upiIds = validUpiIds(typedIds)
+  const [me, setMe] = useMe()
+
+  /** A UPI ID saved earlier: your own, or a friend's. */
+  function savedUpiId(person: string): string {
+    if (me.user && person.toLowerCase() === me.user.name.toLowerCase()) return me.user.upi_id
+    return me.friends.find((friend) => friend.name.toLowerCase() === person.toLowerCase())?.upi_id ?? ''
+  }
+
+  /** Signed in: remember a new UPI ID so it's filled in next time. */
+  function remember(person: string) {
+    const upiId = (typedIds[person] ?? '').trim()
+    if (!me.user || !UPI_ID.test(upiId) || upiId === savedUpiId(person)) return
+    const isMe = person.toLowerCase() === me.user.name.toLowerCase()
+    const save = isMe ? saveMyUpiId(upiId) : saveFriendUpiId(person, upiId)
+    save.then(setMe).catch(() => {}) // saving is a convenience; the requests work either way
+  }
+
+  const shownIds = Object.fromEntries(receivers.map((person) => [person, typedIds[person] ?? savedUpiId(person)]))
+  const upiIds = validUpiIds(shownIds)
   const paidCount = result.payments.filter((payment) => payment.marked_paid_by).length
 
   return (
@@ -53,8 +73,9 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
         <label key={receiver} className="mb-3 block rounded-2xl bg-white p-4">
           <span className="block text-sm text-muted">{receiver}’s UPI ID, so friends can pay in one tap</span>
           <input
-            value={typedIds[receiver] ?? ''}
+            value={shownIds[receiver]}
             onChange={(event) => setTypedIds({ ...typedIds, [receiver]: event.target.value })}
+            onBlur={() => remember(receiver)}
             placeholder="name@okbank"
             autoCapitalize="none"
             autoCorrect="off"

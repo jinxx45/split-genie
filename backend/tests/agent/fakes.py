@@ -1,6 +1,14 @@
 """Stand-ins for the AI steps, so graph tests run without Gemini or an API key."""
 
-from app.agent.receipt import AssignedItem, AssignmentPlan, Correction, CorrectionPlan, LineItem, Receipt, Suggestion
+from app.agent.receipt import (
+    AssignedItem,
+    AssignmentPlan,
+    Correction,
+    CorrectionPlan,
+    LineItem,
+    Receipt,
+    Suggestion,
+)
 from app.money.split import FULL
 
 DINNER: Receipt = {

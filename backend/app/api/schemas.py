@@ -9,7 +9,13 @@ from typing import Annotated
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, StrictBool
 
-from app.agent.receipt import Category, LineItem, assignment_problem, format_rupees, item_label
+from app.agent.receipt import (
+    Category,
+    LineItem,
+    assignment_problem,
+    format_rupees,
+    item_label,
+)
 
 MAX_PEOPLE = 20
 MAX_NAME_LENGTH = 40
@@ -25,6 +31,7 @@ PHOTO_TYPES = {  # what Gemini can read -> the file extension we save it with
 }
 MAX_AMOUNT_PAISE = 10_000_000  # ₹1,00,000 per line, far above any real bill line
 MAX_QUANTITY = 999
+UPI_ID_PATTERN = r"^[A-Za-z0-9._-]{2,256}@[A-Za-z]{2,64}$"  # name@bank, e.g. priya@okaxis
 
 
 class ItemIn(BaseModel):

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"  # DEBUG also logs each step as it starts
     langsmith_api_key: str = ""  # set it to send traces to LangSmith; empty = off
     langsmith_project: str = "split-genie"
+    google_client_id: str = ""  # from Google Cloud: turns on "Sign in with Google"; empty = off
+    session_secret: str = ""  # signs the sign-in cookie; empty = a new one each start (dev only)
 
 
 settings = Settings()

@@ -1,11 +1,14 @@
-"""The split endpoints: start a split, see where it is, answer its question, retry a failed step.
+"""The split endpoints: start a split, see where it is, answer its question, retry a failed step,
+mark payments, and list the signed-in user's splits.
 
 Every split is a LangGraph thread, saved in SQLite under its id, so a link can be reopened later.
+Signing in is optional; a split started while signed in can only be answered by its owner.
 """
 
 import logging
 import secrets
 import sqlite3
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
@@ -17,6 +20,8 @@ from pydantic import ValidationError
 from app.agent import llm
 from app.agent.graph import build_graph, new_split
 from app.agent.receipt import receipt_total
+from app.api.accounts import AccountStore, User
+from app.api.auth import current_user, get_accounts, require_user
 from app.api.payments import PaymentStore
 from app.api.schemas import (
     MAX_NOTE_LENGTH,
@@ -55,7 +60,48 @@ def get_payments() -> PaymentStore:
     return PaymentStore(settings.database_path)
 
 
+@dataclass
+class Context:
+    """Everything an endpoint needs, as one dependency instead of four."""
+
+    graph: Any
+    payments: PaymentStore
+    accounts: AccountStore
+    user: User | None  # None: not signed in
+
+
+def get_context(
+    graph=Depends(get_graph),
+    payments: PaymentStore = Depends(get_payments),
+    accounts: AccountStore = Depends(get_accounts),
+    user: User | None = Depends(current_user),
+) -> Context:
+    return Context(graph, payments, accounts, user)
+
+
 # --- Endpoints ---
+
+
+@router.get("")
+def my_splits(user: User = Depends(require_user), context: Context = Depends(get_context)) -> dict:
+    """The signed-in user's splits, newest first, for the home screen."""
+    splits = []
+    for split_id, created_at in context.accounts.splits(user.id):
+        split = describe(context, split_id)
+        result = split["result"]
+        splits.append(
+            {
+                "id": split_id,
+                "created_at": created_at,
+                "status": split["status"],
+                "people": split["people"],
+                "title": result["title"] if result else "",
+                "total_paise": result["total_paise"] if result else None,
+                "payments": len(result["payments"]) if result else 0,
+                "paid": sum(1 for payment in result["payments"] if payment["marked_paid_by"]) if result else 0,
+            }
+        )
+    return {"splits": splits}
 
 
 @router.post("", status_code=201)
@@ -63,8 +109,7 @@ def create_split(
     people: list[str] = Form(...),
     note: str = Form("", max_length=MAX_NOTE_LENGTH),
     photos: list[UploadFile] = File(...),
-    graph=Depends(get_graph),
-    payments=Depends(get_payments),
+    context: Context = Depends(get_context),
 ) -> dict:
     """Start a split from receipt photos. Reads the first receipt, then returns its first question."""
     people = clean_people(people)
@@ -73,46 +118,49 @@ def create_split(
     receipt_ids = [save_photo(photo) for photo in photos]
 
     split_id = secrets.token_urlsafe(9)  # 12 characters, unguessable: the link is the access
-    run(graph, split_id, new_split(people, note.strip(), receipt_ids))
-    return describe(graph, payments, split_id)
+    if context.user:  # saved first, so the split is theirs even if reading the bill fails
+        context.accounts.add_split(split_id, context.user.id)
+        friends = [person for person in people if person.lower() != context.user.name.lower()]
+        context.accounts.remember_friends(context.user.id, friends)
+    run(context.graph, split_id, new_split(people, note.strip(), receipt_ids))
+    return describe(context, split_id)
 
 
 @router.get("/{split_id}")
-def get_split(split_id: str, graph=Depends(get_graph), payments=Depends(get_payments)) -> dict:
+def get_split(split_id: str, context: Context = Depends(get_context)) -> dict:
     """Where a split is now. Used when someone opens or reopens a split's link."""
-    return describe(graph, payments, split_id)
+    return describe(context, split_id)
 
 
 @router.post("/{split_id}/answer")
-def answer_split(
-    split_id: str, body: dict[str, Any], graph=Depends(get_graph), payments=Depends(get_payments)
-) -> dict:
+def answer_split(split_id: str, body: dict[str, Any], context: Context = Depends(get_context)) -> dict:
     """Answer the question the split is waiting on, after checking the answer fits that question."""
-    state = load(graph, split_id)
+    check_can_answer(context, split_id)
+    state = load(context.graph, split_id)
     if not state.interrupts:
         raise HTTPException(status_code=409, detail="This split isn't waiting for an answer.")
     question = state.interrupts[0].value
 
-    run(graph, split_id, Command(resume=checked_answer(question, body, state.values)))
-    return describe(graph, payments, split_id)
+    run(context.graph, split_id, Command(resume=checked_answer(question, body, state.values)))
+    return describe(context, split_id)
 
 
 @router.post("/{split_id}/retry")
-def retry_split(split_id: str, graph=Depends(get_graph), payments=Depends(get_payments)) -> dict:
+def retry_split(split_id: str, context: Context = Depends(get_context)) -> dict:
     """Run the step that failed again (for example after Gemini was briefly unavailable)."""
-    state = load(graph, split_id)
+    check_can_answer(context, split_id)
+    state = load(context.graph, split_id)
     if state.interrupts or not state.next:
         raise HTTPException(status_code=409, detail="Nothing to retry.")
-    run(graph, split_id, None)  # None: carry on from where the split stopped
-    return describe(graph, payments, split_id)
+    run(context.graph, split_id, None)  # None: carry on from where the split stopped
+    return describe(context, split_id)
 
 
 @router.post("/{split_id}/payments")
-def mark_payment(
-    split_id: str, mark: PaymentMarkIn, graph=Depends(get_graph), payments=Depends(get_payments)
-) -> dict:
-    """Mark one payment of a finished split as paid, or back to waiting."""
-    state = load(graph, split_id)
+def mark_payment(split_id: str, mark: PaymentMarkIn, context: Context = Depends(get_context)) -> dict:
+    """Mark one payment of a finished split as paid, or back to waiting. Anyone with the link can:
+    friends never need to sign in."""
+    state = load(context.graph, split_id)
     if state.interrupts or state.next:
         raise HTTPException(status_code=409, detail="This split isn't finished yet.")
     values = state.values
@@ -125,10 +173,10 @@ def mark_payment(
         raise reject(f"Not in this split: {mark.by}.")
 
     if mark.paid:
-        payments.mark_paid(split_id, mark.sender, mark.receiver, mark.by)
+        context.payments.mark_paid(split_id, mark.sender, mark.receiver, mark.by)
     else:
-        payments.mark_unpaid(split_id, mark.sender, mark.receiver)
-    return describe(graph, payments, split_id)
+        context.payments.mark_unpaid(split_id, mark.sender, mark.receiver)
+    return describe(context, split_id)
 
 
 # --- Helpers ---
@@ -157,10 +205,22 @@ def run(graph, split_id: str, graph_input) -> None:
         ) from None
 
 
-def describe(graph, payments: PaymentStore, split_id: str) -> dict:
+def can_answer(context: Context, split_id: str) -> bool:
+    """Splits started without signing in can be answered by anyone with the link; others only
+    by their owner."""
+    owner = context.accounts.owner(split_id)
+    return owner is None or (context.user is not None and context.user.id == owner)
+
+
+def check_can_answer(context: Context, split_id: str) -> None:
+    if not can_answer(context, split_id):
+        raise HTTPException(status_code=403, detail="Only the person who started this split can answer its questions.")
+
+
+def describe(context: Context, split_id: str) -> dict:
     """The split as the app sees it: waiting on a question, failed (retry), or done. A done
     split's payments say who marked each one paid (None: still waiting)."""
-    state = load(graph, split_id)
+    state = load(context.graph, split_id)
     values = state.values
     if state.interrupts:
         status, question = "waiting", state.interrupts[0].value
@@ -171,7 +231,7 @@ def describe(graph, payments: PaymentStore, split_id: str) -> dict:
 
     result = None
     if status == "done":
-        marked = payments.marked(split_id)
+        marked = context.payments.marked(split_id)
         result = {
             **bill_summary(values["finished"]),
             "shares": values["shares"],
@@ -185,6 +245,7 @@ def describe(graph, payments: PaymentStore, split_id: str) -> dict:
         "id": split_id,
         "status": status,
         "people": values["people"],
+        "can_answer": can_answer(context, split_id),
         "question": question,
         "result": result,
     }

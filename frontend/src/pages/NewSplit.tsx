@@ -1,4 +1,5 @@
 // Start a split: who was there, an optional note, and photos of the bill.
+// Signed in, you're added for you, recent friends are a tap away, and past splits are below.
 
 import { useState } from 'react'
 import type { FormEvent } from 'react'
@@ -7,6 +8,8 @@ import { ApiError, createSplit } from '../api'
 import { Avatar, ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
 import { personColor } from '../colors'
+import { useMe } from '../useMe'
+import { Account } from './Account'
 
 export function NewSplit() {
   const navigate = useNavigate()
@@ -16,11 +19,25 @@ export function NewSplit() {
   const [photos, setPhotos] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [me, setMe] = useMe()
 
-  function addPerson() {
-    const trimmed = name.trim()
+  // Once we know who's signed in, put them in the split, only while it's still empty, so a name
+  // they removed on purpose doesn't come back. Done during render when the name changes (React's
+  // pattern for adjusting state to new input), which avoids an extra render from an effect.
+  const myName = me.user?.name
+  const [seenName, setSeenName] = useState(myName)
+  if (myName !== seenName) {
+    setSeenName(myName)
+    if (myName && people.length === 0) setPeople([myName])
+  }
+
+  const inSplit = (person: string) => people.some((p) => p.toLowerCase() === person.toLowerCase())
+  const recentFriends = me.friends.filter((friend) => !inSplit(friend.name)).slice(0, 8)
+
+  function addPerson(person = name) {
+    const trimmed = person.trim()
     if (!trimmed) return
-    if (people.some((person) => person.toLowerCase() === trimmed.toLowerCase())) {
+    if (inSplit(trimmed)) {
       setError(`${trimmed} is already in the split.`)
       return
     }
@@ -91,13 +108,28 @@ export function NewSplit() {
           />
           <button
             type="button"
-            onClick={addPerson}
+            onClick={() => addPerson()}
             disabled={!name.trim()}
             className="rounded-2xl bg-white px-5 font-display font-semibold text-brand disabled:text-muted/50"
           >
             Add
           </button>
         </div>
+
+        {recentFriends.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="Recent friends">
+            {recentFriends.map((friend) => (
+              <button
+                key={friend.name}
+                type="button"
+                onClick={() => addPerson(friend.name)}
+                className="rounded-full border-2 border-dashed border-steel-dark px-3 py-1 text-sm font-semibold text-muted"
+              >
+                + {friend.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <label className="mt-8 block">
           <span className="font-display text-lg font-semibold">Anything we should know?</span>
@@ -132,6 +164,8 @@ export function NewSplit() {
         </label>
 
         {error && <ErrorText>{error}</ErrorText>}
+
+        <Account me={me} setMe={setMe} />
       </Screen>
     </form>
   )

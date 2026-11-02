@@ -77,6 +77,14 @@ export function SplitPage() {
     return <Done result={split.result} people={split.people} onMark={mark} busy={busy} error={error} />
   }
 
+  if (!split.can_answer) {
+    return (
+      <Screen title="This split isn’t finished yet">
+        <p className="text-muted">The person who started it is still checking the bill. Open this link again once they’re done.</p>
+      </Screen>
+    )
+  }
+
   if (split.status === 'failed' || !split.question) {
     return (
       <Screen

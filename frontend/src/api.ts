@@ -59,6 +59,7 @@ export type Split = {
   id: string
   status: 'waiting' | 'failed' | 'done'
   people: string[]
+  can_answer: boolean // false: started by someone else while signed in; only they can answer
   question: Question | null
   result: {
     title: string // the place names of every receipt, e.g. 'Hotel Saravana'; '' if none
@@ -70,9 +71,24 @@ export type Split = {
   } | null
 }
 
+/** One of the signed-in user's splits, for the history list. */
+export type SplitSummary = {
+  id: string
+  created_at: string // UTC, "2026-11-02 09:14:05"
+  status: Split['status']
+  people: string[]
+  title: string
+  total_paise: number | null // null until the split is done
+  payments: number
+  paid: number
+}
+
+export type Friend = { name: string; upi_id: string }
+export type Me = { user: { name: string; email: string; upi_id: string } | null; friends: Friend[] }
+
 export class ApiError extends Error {}
 
-async function request(path: string, init?: RequestInit): Promise<Split> {
+async function request<T = Split>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
@@ -81,7 +97,7 @@ async function request(path: string, init?: RequestInit): Promise<Split> {
       typeof body.detail === 'string' ? body.detail : 'Please check the details and try again.'
     throw new ApiError(message)
   }
-  return body as Split
+  return body as T
 }
 
 const json = (body: unknown): RequestInit => ({
@@ -103,3 +119,14 @@ export const answerSplit = (id: string, answer: unknown) =>
   request(`/api/splits/${id}/answer`, json(answer))
 export const retrySplit = (id: string) => request(`/api/splits/${id}/retry`, { method: 'POST' })
 export const markPayment = (id: string, mark: PaymentMark) => request(`/api/splits/${id}/payments`, json(mark))
+
+// --- Signing in, and the signed-in user's details ---
+
+export const getAuthConfig = () => request<{ google_client_id: string }>('/api/auth/config')
+export const getMe = () => request<Me>('/api/me')
+export const signInWithGoogle = (credential: string) => request<Me>('/api/auth/google', json({ credential }))
+export const signOut = () => request<Me>('/api/auth/sign-out', { method: 'POST' })
+export const getMySplits = () => request<{ splits: SplitSummary[] }>('/api/splits')
+export const saveMyUpiId = (upi_id: string) => request<Me>('/api/me', { ...json({ upi_id }), method: 'PATCH' })
+export const saveFriendUpiId = (name: string, upi_id: string) =>
+  request<Me>('/api/me/friends', { ...json({ name, upi_id }), method: 'PUT' })

@@ -1,45 +1,15 @@
 """The split API end to end over HTTP, with the fake AI in place of Gemini."""
 
 import pytest
-from fastapi.testclient import TestClient
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.graph import build_graph
 from app.api import splits
-from app.api.payments import PaymentStore
 from app.api.splits import bill_summary
 from app.main import app
 from tests.agent import fakes
 from tests.agent.fakes import DINNER, LUNCH
-
-PEOPLE = ["Arun", "Priya", "Ravi"]
-JPEG = ("bill.jpg", b"\xff\xd8\xff fake jpeg bytes", "image/jpeg")
-
-
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    """An API client whose agent uses the fakes and keeps splits in memory."""
-    monkeypatch.setattr(splits.settings, "uploads_dir", tmp_path / "uploads")
-    graph = build_graph(
-        InMemorySaver(), fakes.read_receipt, fakes.suggest_assignments, fakes.correct_assignments
-    )
-    payments = PaymentStore(tmp_path / "payments.db")
-    app.dependency_overrides[splits.get_graph] = lambda: graph
-    app.dependency_overrides[splits.get_payments] = lambda: payments
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-
-
-def create(client, people=PEOPLE, note="Ravi doesn't drink", photos=(JPEG,)):
-    return client.post(
-        "/api/splits",
-        data={"people": list(people), "note": note},
-        files=[("photos", photo) for photo in photos],
-    )
-
-
-def answer(client, split_id, body):
-    return client.post(f"/api/splits/{split_id}/answer", json=body)
+from tests.api.helpers import JPEG, PEOPLE, answer, create
 
 
 def to_payer_step(client):
