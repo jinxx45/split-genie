@@ -1,6 +1,7 @@
 // One split, at /split/:id. Shows whichever screen the split is waiting on.
 // The server is the source of truth: after every answer we show what it sends back.
 // A friend's link (?for=Arun) shows their own screens: what they had, then what they owe.
+// The group link shared on WhatsApp (?who) first asks "Who are you?", then becomes their link.
 
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router'
@@ -12,7 +13,8 @@ import { ConfirmItems } from '../steps/ConfirmItems'
 import { Done } from '../steps/Done'
 import { ReviewItems } from '../steps/ReviewItems'
 import { WhoPaid } from '../steps/WhoPaid'
-import { ErrorText, PrimaryButton, Screen } from '../ui'
+import { personColor } from '../colors'
+import { Avatar, ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
 
 export type StepProps<Q> = {
@@ -75,38 +77,33 @@ export function SplitPage() {
     )
   }
 
-  if (split.status === 'done' && split.result) {
-    const mark = (body: PaymentMark) => send(() => markPayment(id, body), false)
-    return <Done result={split.result} people={split.people} onMark={mark} busy={busy} error={error} />
-  }
-
   const friend = params.get('for')
   const isFriend = friend !== null && split.people.includes(friend)
   const asking = split.question?.step === 'review_assignments' ? split.question : null
+  const done = split.status === 'done' ? split.result : null
+
+  /** Turn the group link into this person's own link, keeping the rest (UPI IDs) as it is. */
+  function choose(person: string) {
+    const next = new URLSearchParams(params)
+    next.delete('who')
+    next.set('for', person)
+    setParams(next)
+  }
+
+  // Asked from the group link, or a friend opened a split someone else is still working on.
+  if ((params.has('who') && !isFriend && (done || asking)) || (asking && !split.can_answer && !isFriend)) {
+    const why = done ? 'see what you owe and pay' : 'tap what you had'
+    return <WhoAreYou people={split.people} why={why} onChoose={choose} />
+  }
+
+  if (done) {
+    const mark = (body: PaymentMark) => send(() => markPayment(id, body), false)
+    return <Done result={done} people={split.people} onMark={mark} busy={busy} error={error} />
+  }
 
   if (asking && isFriend) {
     const claim = (items: Record<number, number>) => send(() => claimItems(id, friend, items))
     return <ClaimItems key={version} question={asking} friend={friend} onClaim={claim} busy={busy} error={error} />
-  }
-
-  if (asking && !split.can_answer) {
-    return (
-      <Screen title="Who are you?">
-        <p className="mb-5 text-muted">Pick your name to tap what you had.</p>
-        <div className="flex flex-wrap gap-2">
-          {split.people.map((person) => (
-            <button
-              key={person}
-              type="button"
-              onClick={() => setParams({ for: person })}
-              className="rounded-full bg-white px-4 py-2 font-semibold"
-            >
-              {person}
-            </button>
-          ))}
-        </div>
-      </Screen>
-    )
   }
 
   if (isFriend || !split.can_answer) {
@@ -145,6 +142,27 @@ export function SplitPage() {
     case 'approve':
       return <Approve key={version} {...props} question={question} />
   }
+}
+
+function WhoAreYou(props: { people: string[]; why: string; onChoose: (person: string) => void }) {
+  return (
+    <Screen title="Who are you?">
+      <p className="mb-5 text-muted">Pick your name to {props.why}.</p>
+      <div className="flex flex-wrap gap-2">
+        {props.people.map((person) => (
+          <button
+            key={person}
+            type="button"
+            onClick={() => props.onChoose(person)}
+            className="flex items-center gap-2 rounded-full bg-white py-1.5 pr-4 pl-1.5 font-semibold"
+          >
+            <Avatar name={person} color={personColor(props.people, person)} />
+            {person}
+          </button>
+        ))}
+      </div>
+    </Screen>
+  )
 }
 
 function message(problem: unknown): string {

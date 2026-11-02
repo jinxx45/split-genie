@@ -1,6 +1,6 @@
 // The finished split, in two views:
-// - the person who split it: a summary, then each payment with a WhatsApp request, and whether
-//   it has been paid;
+// - the person who split it: a summary, one WhatsApp message for the group (or any chats), and
+//   whether each payment has been paid;
 // - a friend opening that request (?for=Arun): their own share first, with a UPI pay button and
 //   "I've paid".
 
@@ -56,12 +56,26 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
   const paidCount = result.payments.filter((payment) => payment.marked_paid_by).length
 
   return (
-    <Screen title="Split done">
+    <Screen
+      title="Split done"
+      action={
+        waiting.length > 0 && (
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(summaryMessage(result, people, upiIds))}`}
+            target="_blank"
+            rel="noreferrer"
+            className="block w-full rounded-2xl bg-brand px-5 py-4 text-center font-display text-lg font-semibold text-white active:scale-[0.98]"
+          >
+            Share on WhatsApp
+          </a>
+        )
+      }
+    >
       <BillSummary result={result} people={people} />
 
       {result.payments.length > 0 && (
         <>
-          <h2 className="mt-8 font-display text-xl font-semibold">Send each friend their share</h2>
+          <h2 className="mt-8 font-display text-xl font-semibold">Who pays whom</h2>
           <p className="mb-3 text-muted">
             {paidCount === result.payments.length
               ? 'Everyone has paid.'
@@ -91,24 +105,14 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
             // The person being paid can undo a mistaken mark.
             <PaidRow payment={payment} busy={busy} onUndo={() => onMark(markFor(payment, false, payment.receiver))} />
           ) : (
-            <div className="mt-3 flex gap-2">
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(requestMessage(payment, result.title, upiIds))}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 rounded-xl bg-steel py-2.5 text-center font-display font-semibold"
-              >
-                Send on WhatsApp
-              </a>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onMark(markFor(payment, true, payment.receiver))}
-                className="rounded-xl px-3 font-display font-semibold text-muted"
-              >
-                Mark paid
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onMark(markFor(payment, true, payment.receiver))}
+              className="mt-2 text-sm font-semibold text-muted"
+            >
+              Mark as paid
+            </button>
           )
         }
       />
@@ -221,16 +225,21 @@ function BillSummary({ result, people }: Base) {
   )
 }
 
-/** The WhatsApp message for one payment. Its link opens the sender's own view of the split. */
-function requestMessage(payment: Payment, title: string, upiIds: Record<string, string>): string {
-  const params = new URLSearchParams({ for: payment.sender })
-  // Every UPI ID typed in goes in the link as name:id, so the friend gets pay buttons.
+/** One WhatsApp message for everyone: who pays whom, and one link. Each friend opens it, picks
+ * their name, and sees their own share with a pay button. Sent to a group or to several chats. */
+function summaryMessage(result: Result, people: string[], upiIds: Record<string, string>): string {
+  const params = new URLSearchParams({ who: '' })
+  // Every UPI ID typed in goes in the link as name:id, so friends get pay buttons.
   Object.entries(upiIds).forEach(([person, id]) => params.append('upi', `${person}:${id}`))
   const link = `${window.location.origin}${window.location.pathname}?${params}`
+  const waiting = result.payments.filter((payment) => !payment.marked_paid_by)
 
   return [
-    `${payment.receiver} requests a split of ${formatRupees(payment.amount_paise)} for ${title || 'the bill'}.`,
-    'Tap this link for your breakdown:',
+    `*${result.title || 'The bill'}*: ${formatRupees(result.total_paise)}, split between ${people.length}`,
+    '',
+    ...waiting.map((payment) => `${payment.sender} pays ${payment.receiver} ${formatRupees(payment.amount_paise)}`),
+    '',
+    'Open your share and pay in one tap:',
     link,
   ].join('\n')
 }

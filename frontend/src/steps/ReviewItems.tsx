@@ -74,7 +74,8 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
   )
 }
 
-/** Send each friend a link to tap what they had, see who has answered, and use their answers. */
+/** One WhatsApp message with one link for the group: each friend picks their name and taps what
+ * they had. Then see who has answered, and use their answers. */
 function AskFriends(props: {
   people: string[]
   place: string
@@ -84,11 +85,8 @@ function AskFriends(props: {
   const { people, place, claims, onUse } = props
   const answered = people.filter((person) => claims[person] !== undefined)
 
-  function linkFor(person: string): string {
-    const link = `${window.location.origin}${window.location.pathname}?${new URLSearchParams({ for: person })}`
-    const message = `Splitting the bill${place ? ` for ${place}` : ''}. Tap what you had:\n${link}`
-    return `https://wa.me/?text=${encodeURIComponent(message)}`
-  }
+  const link = `${window.location.origin}${window.location.pathname}?who`
+  const message = `Splitting the bill${place ? ` for ${place}` : ''}. Tap what you had:\n${link}`
 
   return (
     <details open={answered.length > 0} className="group mb-3 rounded-2xl bg-white p-4">
@@ -96,26 +94,25 @@ function AskFriends(props: {
         Ask friends what they had
         <span aria-hidden className="text-muted transition group-open:rotate-180">⌄</span>
       </summary>
-      <p className="text-sm text-muted">Each friend gets a link to tap their items. You check before anything is final.</p>
-      <ul className="mt-3 divide-y divide-steel">
+      <p className="text-sm text-muted">One link for the group: each friend taps their own items. You check before anything is final.</p>
+      <a
+        href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 block rounded-xl bg-steel py-2.5 text-center font-display font-semibold"
+      >
+        Send the link on WhatsApp
+      </a>
+      <div className="mt-3 flex flex-wrap gap-2" aria-label="Who has answered">
         {people.map((person) => (
-          <li key={person} className="flex items-center gap-3 py-2">
-            <Avatar name={person} color={personColor(people, person)} />
-            <span className="flex-1">
-              <span className="font-semibold">{person}</span>
-              <span className="block text-sm text-muted">{claims[person] ? '✓ Answered' : 'Waiting'}</span>
-            </span>
-            <a
-              href={linkFor(person)}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl bg-steel px-3 py-2 text-sm font-semibold"
-            >
-              {claims[person] ? 'Send again' : 'Send link'}
-            </a>
-          </li>
+          <span
+            key={person}
+            className={`rounded-full px-3 py-1 text-sm font-semibold ${claims[person] ? 'bg-brand text-white' : 'bg-steel text-muted'}`}
+          >
+            {claims[person] ? `✓ ${person}` : person}
+          </span>
         ))}
-      </ul>
+      </div>
       {answered.length > 0 && (
         <button
           type="button"
