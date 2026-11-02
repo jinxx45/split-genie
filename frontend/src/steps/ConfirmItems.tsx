@@ -1,4 +1,4 @@
-// Step 1: check what was read off the bill, and fix any line by tapping it.
+// Step 1: check what was read off the bill. Tap a line to fix or delete it, or add one that was missed.
 
 import { useState } from 'react'
 import type { Question, Receipt } from '../api'
@@ -12,6 +12,7 @@ type Props = StepProps<Extract<Question, { step: 'confirm_items' }>>
 export function ConfirmItems({ question, answer, busy, error }: Props) {
   const [receipt, setReceipt] = useState<Receipt>(question.receipt)
   const [editing, setEditing] = useState<number | null>(null)
+  const [added, setAdded] = useState<number | null>(null) // a line just added and not saved yet
 
   const itemsTotal = receipt.items.reduce((sum, item) => sum + item.amount_paise, 0)
   const total = itemsTotal + receipt.tax_paise + receipt.service_charge_paise
@@ -23,6 +24,26 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
     )
     setReceipt({ ...receipt, items })
     setEditing(null)
+    setAdded(null)
+  }
+
+  function remove(index: number) {
+    setReceipt({ ...receipt, items: receipt.items.filter((_, i) => i !== index) })
+    setEditing(null)
+    setAdded(null)
+  }
+
+  function addLine() {
+    const items = [...receipt.items, { name: '', amount_paise: 0, category: 'food' as const, quantity: 1 }]
+    setReceipt({ ...receipt, items })
+    setEditing(items.length - 1)
+    setAdded(items.length - 1)
+  }
+
+  function cancel(index: number) {
+    // Cancelling a line that was never saved takes it away again.
+    if (index === added) remove(index)
+    else setEditing(null)
   }
 
   return (
@@ -30,12 +51,12 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
       title="Is this the bill?"
       step={1}
       action={
-        <PrimaryButton busy={busy} onClick={() => answer(receipt)}>
-          Looks right
+        <PrimaryButton busy={busy} disabled={editing !== null} onClick={() => answer(receipt)}>
+          {editing !== null ? 'Save the open line first' : 'Looks right'}
         </PrimaryButton>
       }
     >
-      <p className="mb-4 text-muted">Tap any line to fix it.</p>
+      <p className="mb-4 text-muted">Tap any line to fix or delete it.</p>
       <Paper>
         <input
           value={receipt.place}
@@ -54,7 +75,8 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
                 amountPaise={item.amount_paise}
                 quantity={item.quantity}
                 onSave={(name, amount, quantity) => update(index, name, amount, quantity)}
-                onCancel={() => setEditing(null)}
+                onCancel={() => cancel(index)}
+                onDelete={receipt.items.length > 1 && index !== added ? () => remove(index) : undefined}
               />
             ) : (
               <li key={index}>
@@ -70,6 +92,11 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
             ),
           )}
         </ul>
+        {editing === null && (
+          <button type="button" onClick={addLine} className="w-full py-2 text-left font-semibold text-muted">
+            + Add a line
+          </button>
+        )}
         <div className="mt-2 border-t border-dashed border-steel-dark pt-2 text-muted">
           <Line label="Tax and adjustments" paise={receipt.tax_paise} />
           {receipt.service_charge_paise > 0 && <Line label="Service charge" paise={receipt.service_charge_paise} />}
@@ -107,9 +134,10 @@ function EditLine(props: {
   quantity: number
   onSave: (name: string, amountPaise: number, quantity: number) => void
   onCancel: () => void
+  onDelete?: () => void // missing when the line can't be deleted (the last one, or a new one)
 }) {
   const [name, setName] = useState(props.name)
-  const [amount, setAmount] = useState(toRupeesText(props.amountPaise))
+  const [amount, setAmount] = useState(props.amountPaise ? toRupeesText(props.amountPaise) : '')
   const [quantity, setQuantity] = useState(String(props.quantity))
   const paise = parseRupees(amount)
   const count = /^\d{1,3}$/.test(quantity) && Number(quantity) > 0 ? Number(quantity) : null
@@ -122,6 +150,8 @@ function EditLine(props: {
           value={name}
           onChange={(event) => setName(event.target.value)}
           aria-label="Item name"
+          placeholder="Item"
+          autoFocus={props.name === ''}
           className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1.5"
         />
         <label className="flex items-center rounded-lg bg-white pl-2">
@@ -142,8 +172,13 @@ function EditLine(props: {
           className="amount w-24 rounded-lg bg-white px-2 py-1.5 text-right"
         />
       </div>
-      <div className="mt-2 flex justify-end gap-2 text-sm font-semibold">
-        <button type="button" onClick={props.onCancel} className="px-3 py-1 text-muted">
+      <div className="mt-2 flex gap-2 text-sm font-semibold">
+        {props.onDelete && (
+          <button type="button" onClick={props.onDelete} className="px-1 py-1 text-chilli">
+            Delete
+          </button>
+        )}
+        <button type="button" onClick={props.onCancel} className="ml-auto px-3 py-1 text-muted">
           Cancel
         </button>
         <button
