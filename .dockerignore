@@ -1,0 +1,13 @@
+# Not needed to build the image (and secrets must never go into it).
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+**/.pytest_cache
+backend/static
+backend/uploads
+**/*.db
+**/*.db-*
+**/.env
+**/.env.*
+.git

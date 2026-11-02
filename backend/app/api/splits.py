@@ -9,10 +9,11 @@ import logging
 import secrets
 import sqlite3
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 from pydantic import ValidationError
@@ -23,7 +24,10 @@ from app.agent.receipt import apply_claims, receipt_total
 from app.api.accounts import AccountStore, User
 from app.api.auth import current_user, get_accounts, require_user
 from app.api.claims import ClaimStore
+from app.api.db import get_database
+from app.api.limits import RateLimit
 from app.api.payments import PaymentStore
+from app.api.photos import PhotoStore
 from app.api.schemas import (
     MAX_NOTE_LENGTH,
     MAX_PHOTO_BYTES,
@@ -50,32 +54,44 @@ api_log = logging.getLogger("split_genie.api")
 
 @lru_cache  # built once and shared by every request
 def get_graph():
-    """The agent wired to Gemini and to the SQLite file. Tests replace this with fakes."""
-    connection = sqlite3.connect(settings.database_path, check_same_thread=False)
-    return build_graph(
-        SqliteSaver(connection), llm.read_receipt, llm.suggest_assignments, llm.correct_assignments
-    )
+    """The agent wired to Gemini, saving its progress in the app's database. Tests replace this
+    with fakes."""
+    database = get_database()
+    if database.postgres:
+        checkpointer = PostgresSaver(database.pool)
+        checkpointer.setup()  # creates LangGraph's tables the first time; safe to repeat
+    else:
+        checkpointer = SqliteSaver(sqlite3.connect(database.sqlite_path, check_same_thread=False))
+    read_receipt = partial(llm.read_receipt, load_photo=get_photos().load)
+    return build_graph(checkpointer, read_receipt, llm.suggest_assignments, llm.correct_assignments)
 
 
 @lru_cache
 def get_payments() -> PaymentStore:
-    """Who has paid, kept in the same SQLite file. Tests replace this with a temporary one."""
-    return PaymentStore(settings.database_path)
+    """Who has paid. Tests replace this with a temporary one."""
+    return PaymentStore(get_database())
+
+
+@lru_cache
+def get_photos() -> PhotoStore:
+    """Receipt photos. Tests replace this with a temporary one."""
+    return PhotoStore(get_database())
 
 
 @lru_cache
 def get_claims() -> ClaimStore:
     """What friends say they had. Tests replace this with a temporary one."""
-    return ClaimStore(settings.database_path)
+    return ClaimStore(get_database())
 
 
 @dataclass
 class Context:
-    """Everything an endpoint needs, as one dependency instead of five."""
+    """Everything an endpoint needs, as one dependency instead of six."""
 
     graph: Any
     payments: PaymentStore
     claims: ClaimStore
+    photos: PhotoStore
     accounts: AccountStore
     user: User | None  # None: not signed in
 
@@ -84,10 +100,26 @@ def get_context(
     graph=Depends(get_graph),
     payments: PaymentStore = Depends(get_payments),
     claims: ClaimStore = Depends(get_claims),
+    photos: PhotoStore = Depends(get_photos),
     accounts: AccountStore = Depends(get_accounts),
     user: User | None = Depends(current_user),
 ) -> Context:
-    return Context(graph, payments, claims, accounts, user)
+    return Context(graph, payments, claims, photos, accounts, user)
+
+
+@lru_cache
+def get_split_limit() -> RateLimit:
+    return RateLimit(settings.max_splits_per_hour, window_seconds=60 * 60)
+
+
+def limit_new_splits(request: Request, limit: RateLimit = Depends(get_split_limit)) -> None:
+    """Refuse a new split from a visitor who has started too many in the last hour."""
+    # Behind Render's proxy, uvicorn sets this from the X-Forwarded-For header (--proxy-headers).
+    visitor = request.client.host if request.client else "unknown"
+    if not limit.allow(visitor):
+        raise HTTPException(
+            status_code=429, detail="You've started a lot of splits in the last hour. Please try again later."
+        )
 
 
 # --- Endpoints ---
@@ -121,12 +153,13 @@ def create_split(
     note: str = Form("", max_length=MAX_NOTE_LENGTH),
     photos: list[UploadFile] = File(...),
     context: Context = Depends(get_context),
+    _: None = Depends(limit_new_splits),
 ) -> dict:
     """Start a split from receipt photos. Reads the first receipt, then returns its first question."""
     people = clean_people(people)
     if not 1 <= len(photos) <= MAX_PHOTOS:
         raise reject(f"Add 1 to {MAX_PHOTOS} receipt photos.")
-    receipt_ids = [save_photo(photo) for photo in photos]
+    receipt_ids = [save_photo(context.photos, photo) for photo in photos]
 
     split_id = secrets.token_urlsafe(9)  # 12 characters, unguessable: the link is the access
     if context.user:  # saved first, so the split is theirs even if reading the bill fails
@@ -299,9 +332,9 @@ def bill_summary(finished: list[dict]) -> dict:
     }
 
 
-def save_photo(photo: UploadFile) -> str:
-    extension = PHOTO_TYPES.get(photo.content_type or "")
-    if extension is None:
+def save_photo(store: PhotoStore, photo: UploadFile) -> str:
+    """Check an uploaded photo and save it; returns the id the agent reads it by."""
+    if photo.content_type not in PHOTO_TYPES:
         raise reject("Photos must be JPEG, PNG, WebP or HEIC images.")
     data = photo.file.read(MAX_PHOTO_BYTES + 1)  # read at most one byte past the limit
     if len(data) > MAX_PHOTO_BYTES:
@@ -309,9 +342,8 @@ def save_photo(photo: UploadFile) -> str:
     if not data:
         raise reject("A photo was empty.")
 
-    settings.uploads_dir.mkdir(parents=True, exist_ok=True)
-    receipt_id = f"{secrets.token_hex(16)}{extension}"  # our own name: never trust the uploaded one
-    (settings.uploads_dir / receipt_id).write_bytes(data)
+    receipt_id = secrets.token_hex(16)  # our own id: never trust the uploaded file's name
+    store.save(receipt_id, photo.content_type, data)
     return receipt_id
 
 

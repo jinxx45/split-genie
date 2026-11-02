@@ -2,12 +2,18 @@ import logging
 import time
 import uuid
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api import auth, splits
-from app.observability import configure_logging, elapsed_ms, enable_langsmith_if_configured, log_event
+from app.config import settings
+from app.observability import (
+    configure_logging,
+    elapsed_ms,
+    enable_langsmith_if_configured,
+    log_event,
+)
 
 configure_logging()
 enable_langsmith_if_configured()
@@ -74,3 +80,23 @@ async def readable_validation_error(request: Request, error: RequestValidationEr
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "split-genie"}
+
+
+# --- The React app, when it has been built into frontend_dir (the deployed app) ---
+# Locally, Vite serves the frontend instead and this folder doesn't exist.
+
+if settings.frontend_dir.is_dir():
+    frontend = settings.frontend_dir.resolve()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend_page(path: str) -> FileResponse:
+        """A real file (script, style, icon) if there is one, otherwise the app's page. The app
+        then shows the right screen for addresses like /split/abc itself."""
+        if path.startswith("api/"):  # an API address that doesn't exist: not the app's page
+            raise HTTPException(status_code=404, detail="Not found.")
+        file = (frontend / path).resolve()
+        if path and file.is_file() and frontend in file.parents:  # never serve files outside the folder
+            # Built scripts and styles have a content hash in their names, so they can be cached for good.
+            cache = "public, max-age=31536000, immutable" if path.startswith("assets/") else "no-cache"
+            return FileResponse(file, headers={"Cache-Control": cache})
+        return FileResponse(frontend / "index.html", headers={"Cache-Control": "no-cache"})

@@ -4,17 +4,17 @@ Kept outside the agent: by the time people pay, the split itself is finished. A 
 payment was marked as paid (by the payer, or by the person being paid); no row means waiting.
 """
 
-from app.api.db import SqliteStore
+from app.api.db import Store, now
 
 
-class PaymentStore(SqliteStore):
+class PaymentStore(Store):
     SCHEMA = """
         CREATE TABLE IF NOT EXISTS payments (
             split_id TEXT NOT NULL,
             sender TEXT NOT NULL,
             receiver TEXT NOT NULL,
             marked_by TEXT NOT NULL,
-            marked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            marked_at TEXT NOT NULL,
             PRIMARY KEY (split_id, sender, receiver)
         );
     """
@@ -30,8 +30,12 @@ class PaymentStore(SqliteStore):
     def mark_paid(self, split_id: str, sender: str, receiver: str, marked_by: str) -> None:
         with self.connection() as connection:
             connection.execute(
-                "INSERT OR REPLACE INTO payments (split_id, sender, receiver, marked_by) VALUES (?, ?, ?, ?)",
-                (split_id, sender, receiver, marked_by),
+                """
+                INSERT INTO payments (split_id, sender, receiver, marked_by, marked_at) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (split_id, sender, receiver)
+                DO UPDATE SET marked_by = excluded.marked_by, marked_at = excluded.marked_at
+                """,
+                (split_id, sender, receiver, marked_by, now()),
             )
 
     def mark_unpaid(self, split_id: str, sender: str, receiver: str) -> None:

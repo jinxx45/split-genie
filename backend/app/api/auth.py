@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.api import session
 from app.api.accounts import AccountStore, User
+from app.api.db import get_database
 from app.api.schemas import MAX_NAME_LENGTH, UPI_ID_PATTERN
 from app.config import settings
 
@@ -34,7 +35,7 @@ def get_verifier() -> VerifyToken:
 
 @lru_cache
 def get_accounts() -> AccountStore:
-    return AccountStore(settings.database_path)
+    return AccountStore(get_database())
 
 
 def current_user(request: Request, accounts: AccountStore = Depends(get_accounts)) -> User | None:

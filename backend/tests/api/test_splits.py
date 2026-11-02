@@ -5,6 +5,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.graph import build_graph
 from app.api import splits
+from app.api.limits import RateLimit
 from app.api.splits import bill_summary
 from app.main import app
 from tests.agent import fakes
@@ -101,12 +102,15 @@ def test_photos_are_checked(client, monkeypatch):
     assert "under" in create(client).json()["detail"]
 
 
-def test_uploaded_photos_are_saved_under_our_own_names(client):
-    create(client, photos=[("../../etc/passwd.jpg", b"\xff\xd8\xff", "image/jpeg")])
+def test_uploaded_photos_are_saved_in_the_database_under_our_own_ids(client):
+    split_id = create(client, photos=[("../../etc/passwd.jpg", b"\xff\xd8\xff", "image/jpeg")]).json()["id"]
 
-    saved = list(splits.settings.uploads_dir.iterdir())
-    assert len(saved) == 1
-    assert saved[0].name.endswith(".jpg") and "passwd" not in saved[0].name
+    graph = app.dependency_overrides[splits.get_graph]()
+    photos = app.dependency_overrides[splits.get_photos]()
+    receipt_id = graph.get_state({"configurable": {"thread_id": split_id}}).values["receipt_ids"][0]
+
+    assert "passwd" not in receipt_id
+    assert photos.load(receipt_id) == (b"\xff\xd8\xff", "image/jpeg")
 
 
 # --- Answers are checked against the question they answer ---
@@ -282,3 +286,15 @@ def test_payments_can_only_be_marked_on_a_finished_split(client):
 )
 def test_marking_an_unknown_payment_or_by_an_outsider_is_rejected(client, sender, by, status):
     assert mark(client, finished_split(client), sender, by=by).status_code == status
+
+
+def test_one_visitor_can_only_start_so_many_splits_an_hour(client):
+    limit = RateLimit(2, window_seconds=3600)  # one limiter for every request in the test
+    app.dependency_overrides[splits.get_split_limit] = lambda: limit
+
+    assert create(client).status_code == 201
+    assert create(client).status_code == 201
+    response = create(client)
+
+    assert response.status_code == 429
+    assert "try again later" in response.json()["detail"]

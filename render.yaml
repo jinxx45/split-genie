@@ -1,0 +1,21 @@
+# Render Blueprint: one free web service built from the Dockerfile.
+# In Render: New > Blueprint > this repository. Render asks for the values marked sync: false.
+services:
+  - type: web
+    name: split-rupya
+    runtime: docker
+    plan: free
+    region: singapore  # nearest to India; pick the same region for the Neon database
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL  # the Neon connection string
+        sync: false
+      - key: SESSION_SECRET  # signs the sign-in cookie; Render makes a random one
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID  # optional: leave empty to turn sign-in off
+        sync: false
+      - key: LANGSMITH_API_KEY  # optional: leave empty to turn tracing off
+        sync: false

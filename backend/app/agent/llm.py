@@ -7,6 +7,7 @@ paise, adding up, checking names) is plain Python, so it can be tested without t
 
 import base64
 import mimetypes
+from collections.abc import Callable
 from typing import Literal
 
 from langchain_core.messages import HumanMessage
@@ -272,11 +273,20 @@ def gemini() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(model=settings.gemini_model, api_key=settings.gemini_api_key)
 
 
-def read_receipt(receipt_id: str, feedback: str | None) -> Receipt:
-    """Read the photo saved as uploads/<receipt_id>."""
+LoadPhoto = Callable[[str], tuple[bytes, str]]
+"""receipt id -> (image bytes, content type such as "image/jpeg")."""
+
+
+def photo_from_uploads(receipt_id: str) -> tuple[bytes, str]:
+    """A photo saved as a file in the uploads folder (used by the terminal scripts)."""
     path = settings.uploads_dir / receipt_id
-    image = base64.b64encode(path.read_bytes()).decode()
-    mime_type = mimetypes.guess_type(path.name)[0] or "image/jpeg"
+    return path.read_bytes(), mimetypes.guess_type(path.name)[0] or "image/jpeg"
+
+
+def read_receipt(receipt_id: str, feedback: str | None, load_photo: LoadPhoto = photo_from_uploads) -> Receipt:
+    """Read a receipt photo. The app passes load_photo to read it from the database instead."""
+    data, mime_type = load_photo(receipt_id)
+    image = base64.b64encode(data).decode()
 
     prompt = READ_PROMPT if feedback is None else f"{READ_PROMPT}\n\n{feedback}"
     message = HumanMessage(

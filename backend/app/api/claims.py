@@ -6,17 +6,17 @@ answer ("I had none of this"), so the splitter can see who has replied.
 
 import json
 
-from app.api.db import SqliteStore
+from app.api.db import Store, now
 
 
-class ClaimStore(SqliteStore):
+class ClaimStore(Store):
     SCHEMA = """
         CREATE TABLE IF NOT EXISTS claims (
             split_id TEXT NOT NULL,
             receipt INTEGER NOT NULL,
             person TEXT NOT NULL,
             items TEXT NOT NULL,  -- JSON: {"item index": weight}
-            answered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            answered_at TEXT NOT NULL,
             PRIMARY KEY (split_id, receipt, person)
         );
     """
@@ -25,7 +25,7 @@ class ClaimStore(SqliteStore):
         """person -> {item index: weight}, for everyone who has answered for this receipt."""
         with self.connection() as connection:
             rows = connection.execute(
-                "SELECT person, items FROM claims WHERE split_id = ? AND receipt = ? ORDER BY answered_at, rowid",
+                "SELECT person, items FROM claims WHERE split_id = ? AND receipt = ? ORDER BY answered_at",
                 (split_id, receipt),
             )
             return {
@@ -37,6 +37,10 @@ class ClaimStore(SqliteStore):
         """Save a friend's answer, replacing any earlier one."""
         with self.connection() as connection:
             connection.execute(
-                "INSERT OR REPLACE INTO claims (split_id, receipt, person, items) VALUES (?, ?, ?, ?)",
-                (split_id, receipt, person, json.dumps(items)),
+                """
+                INSERT INTO claims (split_id, receipt, person, items, answered_at) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (split_id, receipt, person)
+                DO UPDATE SET items = excluded.items, answered_at = excluded.answered_at
+                """,
+                (split_id, receipt, person, json.dumps(items), now()),
             )

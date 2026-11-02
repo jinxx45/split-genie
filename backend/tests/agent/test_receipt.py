@@ -1,6 +1,12 @@
 import pytest
 
-from app.agent.receipt import apply_claims, format_rupees, item_label, strip_quantity, to_paise
+from app.agent.receipt import (
+    apply_claims,
+    format_rupees,
+    item_label,
+    strip_quantity,
+    to_paise,
+)
 
 
 @pytest.mark.parametrize(

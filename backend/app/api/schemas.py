@@ -22,7 +22,7 @@ MAX_NAME_LENGTH = 40
 MAX_NOTE_LENGTH = 500
 MAX_PHOTOS = 5
 MAX_PHOTO_BYTES = 10 * 1024 * 1024  # 10 MB
-PHOTO_TYPES = {  # what Gemini can read -> the file extension we save it with
+PHOTO_TYPES = {  # the image types Gemini can read (with their usual file extension)
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",

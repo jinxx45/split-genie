@@ -16,6 +16,7 @@ PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-h
   - `tests/` mirrors `app/`.
 - `frontend/` — React + Vite + TypeScript, Tailwind, shadcn/ui, mobile-first
 - `brand/` — the logo kit and its rules (`BRAND.md`): black, saffron, paper; Sora for the wordmark
+- `Dockerfile`, `render.yaml` — deployment: one free Render web service (FastAPI serves the built React app) with a Neon Postgres database via `DATABASE_URL`. Locally the app uses SQLite.
 
 ### Rules for this codebase
 

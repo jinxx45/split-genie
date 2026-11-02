@@ -7,7 +7,7 @@ so they can be added with a tap next time.
 
 from dataclasses import dataclass
 
-from app.api.db import SqliteStore
+from app.api.db import Store, now
 
 
 @dataclass
@@ -24,7 +24,7 @@ class Friend:
     upi_id: str
 
 
-class AccountStore(SqliteStore):
+class AccountStore(Store):
     SCHEMA = """
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -35,14 +35,15 @@ class AccountStore(SqliteStore):
         CREATE TABLE IF NOT EXISTS split_owners (
             split_id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS friends (
             user_id TEXT NOT NULL,
-            name TEXT NOT NULL COLLATE NOCASE,  -- "priya" and "Priya" are the same friend
+            name_key TEXT NOT NULL,  -- the name in lower case: "priya" and "Priya" are one friend
+            name TEXT NOT NULL,  -- as last typed
             upi_id TEXT NOT NULL DEFAULT '',
-            last_split_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, name)
+            last_split_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, name_key)
         );
     """
 
@@ -73,7 +74,9 @@ class AccountStore(SqliteStore):
 
     def add_split(self, split_id: str, user_id: str) -> None:
         with self.connection() as connection:
-            connection.execute("INSERT INTO split_owners (split_id, user_id) VALUES (?, ?)", (split_id, user_id))
+            connection.execute(
+                "INSERT INTO split_owners (split_id, user_id, created_at) VALUES (?, ?, ?)", (split_id, user_id, now())
+            )
 
     def owner(self, split_id: str) -> str | None:
         """The id of the user who started the split; None if it was started without signing in."""
@@ -85,7 +88,7 @@ class AccountStore(SqliteStore):
         """(split id, when it was started) for the user's splits, newest first."""
         with self.connection() as connection:
             rows = connection.execute(
-                "SELECT split_id, created_at FROM split_owners WHERE user_id = ? ORDER BY created_at DESC, rowid DESC",
+                "SELECT split_id, created_at FROM split_owners WHERE user_id = ? ORDER BY created_at DESC",
                 (user_id,),
             )
             return [(row["split_id"], row["created_at"]) for row in rows]
@@ -96,7 +99,7 @@ class AccountStore(SqliteStore):
         """Everyone the user has split with, most recent first."""
         with self.connection() as connection:
             rows = connection.execute(
-                "SELECT name, upi_id FROM friends WHERE user_id = ? ORDER BY last_split_at DESC, rowid DESC",
+                "SELECT name, upi_id FROM friends WHERE user_id = ? ORDER BY last_split_at DESC",
                 (user_id,),
             )
             return [Friend(**row) for row in rows]
@@ -104,20 +107,22 @@ class AccountStore(SqliteStore):
     def remember_friends(self, user_id: str, names: list[str]) -> None:
         """Save new friends, and move ones split with again to the top of the list."""
         with self.connection() as connection:
-            connection.executemany(
-                """
-                INSERT INTO friends (user_id, name) VALUES (?, ?)
-                ON CONFLICT (user_id, name) DO UPDATE SET last_split_at = CURRENT_TIMESTAMP
-                """,
-                [(user_id, name) for name in names],
-            )
+            for name in names:
+                connection.execute(
+                    """
+                    INSERT INTO friends (user_id, name_key, name, last_split_at) VALUES (?, ?, ?, ?)
+                    ON CONFLICT (user_id, name_key)
+                    DO UPDATE SET name = excluded.name, last_split_at = excluded.last_split_at
+                    """,
+                    (user_id, name.lower(), name, now()),
+                )
 
     def set_friend_upi_id(self, user_id: str, name: str, upi_id: str) -> None:
         with self.connection() as connection:
             connection.execute(
                 """
-                INSERT INTO friends (user_id, name, upi_id) VALUES (?, ?, ?)
-                ON CONFLICT (user_id, name) DO UPDATE SET upi_id = excluded.upi_id
+                INSERT INTO friends (user_id, name_key, name, upi_id, last_split_at) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (user_id, name_key) DO UPDATE SET upi_id = excluded.upi_id
                 """,
-                (user_id, name, upi_id),
+                (user_id, name.lower(), name, upi_id, now()),
             )
