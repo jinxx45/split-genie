@@ -14,9 +14,8 @@ export function Screen(props: {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="flex items-center justify-between px-4 pt-4">
-        <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold text-brand">
-          <img src="/favicon.svg" alt="" className="size-7" />
-          Split Genie
+        <Link to="/" aria-label="Split Rupya, start a new split">
+          <Logo />
         </Link>
         {props.step && <Steps current={props.step} />}
       </header>
@@ -30,6 +29,18 @@ export function Screen(props: {
         </div>
       )}
     </div>
+  )
+}
+
+/** The Split Rupya logo: the split rupee in its black tile, and the wordmark (brand/BRAND.md). */
+export function Logo() {
+  return (
+    <span className="flex items-center gap-2 text-brand">
+      <img src="/favicon.svg" alt="" className="size-7" />
+      <span className="font-brand text-lg tracking-[-0.02em]">
+        <span className="font-bold">Split</span> <span className="font-light">Rupya</span>
+      </span>
+    </span>
   )
 }
 

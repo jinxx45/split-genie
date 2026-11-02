@@ -54,7 +54,7 @@ export function NewSplit() {
       const split = await createSplit(people, note, photos)
       navigate(`/split/${split.id}`)
     } catch (problem) {
-      setError(problem instanceof ApiError ? problem.message : 'Couldn’t reach Split Genie. Check your connection.')
+      setError(problem instanceof ApiError ? problem.message : 'Couldn’t reach Split Rupya. Check your connection.')
       setBusy(false)
     }
   }

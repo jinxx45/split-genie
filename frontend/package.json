@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/baloo-2": "^5.3.0",
     "@fontsource/hind": "^5.3.0",
+    "@fontsource/sora": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

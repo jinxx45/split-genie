@@ -260,7 +260,7 @@ function joinNames(names: string[]): string {
 /** Opens any UPI app (GPay, PhonePe, Paytm…) with the payee and amount filled in. */
 function upiLink(upiId: string, name: string, paise: number): string {
   // encodeURIComponent, not URLSearchParams: some UPI apps show a "+" for a space literally.
-  const params = { pa: upiId, pn: name, am: toRupeesText(paise), cu: 'INR', tn: 'Split Genie' }
+  const params = { pa: upiId, pn: name, am: toRupeesText(paise), cu: 'INR', tn: 'Split Rupya' }
   const query = Object.entries(params)
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join('&')

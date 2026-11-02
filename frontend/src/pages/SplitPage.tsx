@@ -148,5 +148,5 @@ export function SplitPage() {
 }
 
 function message(problem: unknown): string {
-  return problem instanceof ApiError ? problem.message : 'Couldn’t reach Split Genie. Check your connection.'
+  return problem instanceof ApiError ? problem.message : 'Couldn’t reach Split Rupya. Check your connection.'
 }

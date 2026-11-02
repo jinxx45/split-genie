@@ -5,9 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#E8ECEE" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Split Genie</title>
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Split Rupya</title>
+    <!-- The splash screen. Plain HTML and CSS so it shows the moment the page opens, before the
+         app's JavaScript has loaded; main.tsx fades it out once the app is ready. -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #0a0a0a;
+        color: #f6f4ee;
+        transition: opacity 0.35s ease;
+      }
+      #splash.done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash svg {
+        width: 104px;
+        height: 104px;
+      }
+      /* The one motion moment: the rupee splits, its right half sliding up and right. */
+      #splash .right-half {
+        animation: split 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both;
+      }
+      @keyframes split {
+        from { transform: translate(0, 0); }
+        to { transform: translate(5px, -7px); }
+      }
+      #splash p {
+        margin: 0;
+        font: 300 28px/1 "Sora", system-ui, sans-serif;
+        letter-spacing: -0.02em;
+        animation: appear 0.4s ease 0.45s both;
+      }
+      #splash p b {
+        font-weight: 700;
+      }
+      @keyframes appear {
+        from { opacity: 0; transform: translateY(6px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash .right-half, #splash p { animation: none; transform: translate(5px, -7px); }
+        #splash p { transform: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" role="img" aria-label="Split Rupya">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <!-- The ₹ from the brand kit, as an outline (Poppins 700), so no font is needed. -->
+          <path id="rupee" transform="translate(23.688 80) scale(0.08800 -0.08800)" d="M482 587V527H567V423H476Q460 334 398.0 287.5Q336 241 217 241V201Q217 162 232.0 140.5Q247 119 284 119Q319 119 334.0 140.0Q349 161 349 203H507Q503 102 447.5 46.0Q392 -10 288 -10Q176 -10 116.5 48.5Q57 107 57 224V353Q161 353 210.5 357.5Q260 362 284.5 376.5Q309 391 317 423H38V527H322V587H38V702H567V587Z" />
+          <clipPath id="left"><rect x="0" y="0" width="50" height="100" /></clipPath>
+          <clipPath id="right"><rect x="50" y="0" width="50" height="100" /></clipPath>
+        </defs>
+        <use href="#rupee" fill="#f6f4ee" clip-path="url(#left)" />
+        <g class="right-half"><use href="#rupee" fill="#f2a93b" clip-path="url(#right)" /></g>
+      </svg>
+      <p aria-hidden="true"><b>Split</b> Rupya</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

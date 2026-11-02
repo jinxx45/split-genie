@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-## Project: Split Genie
+## Project: Split Rupya
 
-Split Genie turns a photo of a group bill into exact, itemised shares and one-tap UPI payments. A LangGraph agent reads the receipt, assigns items from the splitter's note, asks about unclear items, and hands the maths to plain Python.
+Split Rupya (formerly Split Genie; the repo and internal names such as `split_genie` keep the old name) turns a photo of a group bill into exact, itemised shares and one-tap UPI payments. A LangGraph agent reads the receipt, assigns items from the splitter's note, asks about unclear items, and hands the maths to plain Python.
 
 PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-hMSBmnXqHkBic-is18ws/edit
 (Version with the agent graph diagram: https://claude.ai/artifact/92ycqqQeN89Y1D1MkE5QAw)
@@ -15,6 +15,7 @@ PRD (V1 one-pager): https://docs.google.com/document/d/1CdCntVAUfaobB7IhQBtZN8-h
   - `app/api/` — HTTP endpoints. May use `agent/` and `money/`.
   - `tests/` mirrors `app/`.
 - `frontend/` — React + Vite + TypeScript, Tailwind, shadcn/ui, mobile-first
+- `brand/` — the logo kit and its rules (`BRAND.md`): black, saffron, paper; Sora for the wordmark
 
 ### Rules for this codebase
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { getMySplits, signInWithGoogle, signOut } from '../api'
+import { getAuthConfig, getMySplits, signInWithGoogle, signOut } from '../api'
 import type { Me, SplitSummary } from '../api'
 import { GoogleButton } from '../GoogleButton'
 import { formatRupees } from '../money'
@@ -10,6 +10,13 @@ import { ErrorText } from '../ui'
 
 export function Account({ me, setMe }: { me: Me; setMe: (me: Me) => void }) {
   const [error, setError] = useState<string | null>(null)
+  // Google's client ID from the server; '' until it arrives, and when sign-in isn't set up.
+  const [clientId, setClientId] = useState('')
+  useEffect(() => {
+    getAuthConfig()
+      .then((config) => setClientId(config.google_client_id))
+      .catch(() => setClientId(''))
+  }, [])
 
   async function signIn(credential: string) {
     try {
@@ -21,11 +28,12 @@ export function Account({ me, setMe }: { me: Me; setMe: (me: Me) => void }) {
   }
 
   if (!me.user) {
+    if (!clientId) return null // sign-in isn't set up on this server: nothing to offer
     return (
       <section className="mt-10 rounded-2xl bg-white/60 p-4">
         <p className="font-display text-lg font-semibold">Keep your splits and friends</p>
         <p className="mb-3 text-sm text-muted">Optional. Sign in to see past splits and add friends with a tap.</p>
-        <GoogleButton onCredential={signIn} />
+        <GoogleButton clientId={clientId} onCredential={signIn} />
         {error && <ErrorText>{error}</ErrorText>}
       </section>
     )

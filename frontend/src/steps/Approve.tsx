@@ -1,4 +1,4 @@
-// Step 4: approve the split, or say what's wrong and let Split Genie fix it.
+// Step 4: approve the split, or say what's wrong and let Split Rupya fix it.
 
 import { useState } from 'react'
 import type { Assignment, Question } from '../api'
@@ -32,7 +32,7 @@ export function Approve({ question, people, answer, busy, error }: Props) {
   return (
     <Screen title="Here’s the split" step={4} action={action}>
       {question.changes.length > 0 && (
-        <div className="mb-5 rounded-2xl bg-turmeric-soft p-4">
+        <div className="mb-5 rounded-2xl bg-saffron-soft p-4">
           <p className="font-display text-lg font-semibold">Changed from your note</p>
           <ul className="mt-1 space-y-1">
             {question.changes.map((change, index) => (

@@ -110,7 +110,7 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
       {matches ? (
         <p className="mt-4 text-brand">✓ Matches the total printed on the bill.</p>
       ) : (
-        <p className="mt-4 rounded-xl bg-turmeric-soft px-3 py-2">
+        <p className="mt-4 rounded-xl bg-saffron-soft px-3 py-2">
           The bill says {formatRupees(receipt.printed_total_paise)}. Check the lines above for a misread price.
         </p>
       )}

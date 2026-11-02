@@ -1,4 +1,4 @@
-"""The Split Genie agent: a LangGraph state graph that pauses for the user.
+"""The Split Rupya agent: a LangGraph state graph that pauses for the user.
 
 Flow (see the PRD diagram):
     extract_items -> (totals match? retry up to 2 times) -> confirm_items [pause]

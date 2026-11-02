@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
-/* Design tokens: steel plate, black ink, a turmeric spark. */
+/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, saffron, paper, on a steel-grey page. */
 @theme {
   --color-steel: #e8ecee;
   --color-steel-dark: #d5dbde;
-  --color-brand: #17181a;
-  --color-turmeric: #f2b705;
-  --color-turmeric-soft: #fdf3d0;
-  --color-ink: #17181a;
+  --color-brand: #0a0a0a;
+  --color-saffron: #f2a93b; /* accents and highlights only, never body text on white */
+  --color-saffron-soft: #fcefd9;
+  --color-paper: #f6f4ee; /* text on black */
+  --color-ink: #0a0a0a;
   --color-muted: #5e6469;
   --color-chilli: #c73a2b;
 
   --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --font-brand: "Sora", system-ui, sans-serif; /* the wordmark only */
   --font-body: "Hind", system-ui, sans-serif;
 }
 
@@ -58,6 +60,6 @@ html {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-turmeric);
+  outline: 3px solid var(--color-saffron);
   outline-offset: 2px;
 }

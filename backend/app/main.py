@@ -14,7 +14,7 @@ enable_langsmith_if_configured()
 
 api_log = logging.getLogger("split_genie.api")
 
-app = FastAPI(title="Split Genie API")
+app = FastAPI(title="Split Rupya API")
 app.include_router(auth.router)
 app.include_router(splits.router)
 

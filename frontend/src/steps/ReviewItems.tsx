@@ -1,4 +1,4 @@
-// Step 2: who had what. Every item, with the people Split Genie suggests.
+// Step 2: who had what. Every item, with the people Split Rupya suggests.
 // Shared items: tap a name to change their share. Items ordered several times ("Cold Coffee x3")
 // can instead be split by count: who had how many. Unfinished items are highlighted.
 // At the top, "Ask friends" sends each friend a link to tap what they had, and "Anyone eat less?"
@@ -36,7 +36,7 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
   const unfinished = question.items.filter((entry, index) => !isFinished(assignments[index], entry.item.quantity)).length
 
   function submit() {
-    // Send only what the user changed; untouched items keep Split Genie's suggestion.
+    // Send only what the user changed; untouched items keep Split Rupya's suggestion.
     const changes: Record<number, Assignment> = {}
     question.items.forEach((entry, index) => {
       if (!sameAssignment(entry.suggested, assignments[index])) changes[entry.index] = assignments[index]
@@ -186,7 +186,7 @@ function ItemCard(props: {
   }
 
   return (
-    <li className={`rounded-2xl p-4 transition-colors ${unfinished ? 'bg-turmeric-soft ring-2 ring-turmeric' : 'bg-white'}`}>
+    <li className={`rounded-2xl p-4 transition-colors ${unfinished ? 'bg-saffron-soft ring-2 ring-saffron' : 'bg-white'}`}>
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-semibold">{itemLabel(entry.item)}</span>
         <span className="amount">{formatRupees(entry.item.amount_paise)}</span>

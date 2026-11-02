@@ -1,4 +1,4 @@
-// Types and calls for the Split Genie API. Shapes match backend/app/api/splits.py.
+// Types and calls for the Split Rupya API. Shapes match backend/app/api/splits.py.
 
 export type Weight = 1 | 2 // 1 = half share, 2 = full share
 
@@ -101,7 +101,7 @@ async function request<T = Split>(path: string, init?: RequestInit): Promise<T> 
   try {
     response = await fetch(path, init)
   } catch {
-    throw new ApiError('Couldn’t reach Split Genie. Check your internet connection and try again.')
+    throw new ApiError('Couldn’t reach Split Rupya. Check your internet connection and try again.')
   }
   const body = await response.json().catch(() => null) // null: the reply wasn't JSON
   if (!response.ok) throw new ApiError(errorMessage(response, body))
@@ -115,7 +115,7 @@ function errorMessage(response: Response, body: { detail?: unknown } | null): st
   // Every reply from the backend carries a request id. Without one, the dev server (or a proxy
   // in production) answered because the backend didn't.
   if (!response.headers.has('X-Request-ID')) {
-    return 'The Split Genie server isn’t responding. If you’re running it yourself, check that the backend is started.'
+    return 'The Split Rupya server isn’t responding. If you’re running it yourself, check that the backend is started.'
   }
   const ref = response.headers.get('X-Request-ID')
   return `Something went wrong on our side (error ${response.status}, ref ${ref}). Please try again.`

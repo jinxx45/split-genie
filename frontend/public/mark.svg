@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <path id="rupee" transform="translate(23.688 80) scale(0.08800 -0.08800)" d="M482 587V527H567V423H476Q460 334 398.0 287.5Q336 241 217 241V201Q217 162 232.0 140.5Q247 119 284 119Q319 119 334.0 140.0Q349 161 349 203H507Q503 102 447.5 46.0Q392 -10 288 -10Q176 -10 116.5 48.5Q57 107 57 224V353Q161 353 210.5 357.5Q260 362 284.5 376.5Q309 391 317 423H38V527H322V587H38V702H567V587Z"/>
+    <clipPath id="left"><rect x="0" y="0" width="50" height="100"/></clipPath>
+    <clipPath id="right"><rect x="50" y="0" width="50" height="100"/></clipPath>
+  </defs>
+  <use href="#rupee" fill="#F6F4EE" clip-path="url(#left)"/>
+  <g transform="translate(5 -7)"><use href="#rupee" fill="#F2A93B" clip-path="url(#right)"/></g>
+</svg>
