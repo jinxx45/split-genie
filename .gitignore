@@ -17,3 +17,5 @@ __pycache__/
 # Receipt photos and splits saved by the app
 uploads/
 *.db
+*.db-shm
+*.db-wal
