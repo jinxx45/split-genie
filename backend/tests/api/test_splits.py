@@ -156,7 +156,7 @@ def test_bad_receipt_edits_are_rejected(client):
         ({"1": {"weights": {"Rahul": 2}}}, "Not in this split: Rahul"),
         ({"1": {"weights": {}}}, "at least one person"),
         ({"1": {"weights": {"Arun": 3}}}, "full or half"),
-        ({"1": {"weights": {"Arun": 1}, "by_count": True}}, "Kingfisher x2: 1 of 2 still need a name"),
+        ({"1": {"weights": {"Arun": 1}, "by_count": True}}, "Kingfisher ×2: 1 of 2 still need a name"),
         ({"1": {"weights": {"Arun": 2, "Ravi": 1}, "by_count": True}}, "only 2 were ordered"),
         ({"1": {"weights": {"Arun": 0}, "by_count": True}}, "changes.1.weights.Arun"),
     ],

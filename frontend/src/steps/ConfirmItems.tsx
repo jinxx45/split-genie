@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Question, Receipt } from '../api'
+import { itemLabel } from '../items'
 import { formatRupees, parseRupees, toRupeesText } from '../money'
 import type { StepProps } from '../pages/SplitPage'
 import { ErrorText, Paper, PrimaryButton, Screen } from '../ui'
@@ -62,7 +63,7 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
                   onClick={() => setEditing(index)}
                   className="flex w-full items-baseline justify-between gap-3 py-2 text-left"
                 >
-                  <span>{item.name}</span>
+                  <span>{itemLabel(item)}</span>
                   <span className="amount">{formatRupees(item.amount_paise)}</span>
                 </button>
               </li>

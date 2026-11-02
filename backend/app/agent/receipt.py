@@ -3,6 +3,7 @@
 Plain data and small helpers only. No AI in here.
 """
 
+import re
 from decimal import Decimal, InvalidOperation
 from typing import Literal, TypedDict
 
@@ -15,7 +16,7 @@ class LineItem(TypedDict):
     name: str
     amount_paise: int
     category: Category
-    quantity: int  # how many were ordered, e.g. 3 for "Cold Coffee x3"
+    quantity: int  # how many were ordered; the name doesn't repeat it ("Cold Coffee", 3)
 
 
 class Receipt(TypedDict):
@@ -30,7 +31,7 @@ class Assignment(TypedDict):
     """Who had one item, in one of two ways:
     - shared (by_count False): weights are FULL or HALF shares, e.g. a biryani everyone ate;
     - by count (by_count True): weights are how many each person had, adding up to the item's
-      quantity, e.g. "Cold Coffee x3": {"Priya": 1, "Arun": 2}.
+      quantity, e.g. Cold Coffee ×3: {"Priya": 1, "Arun": 2}.
     Empty weights mean "not decided yet".
     """
 
@@ -86,6 +87,21 @@ def assignment_problem(assignment: Assignment, quantity: int) -> str | None:
     elif any(weight not in (FULL, HALF) for weight in weights.values()):
         return "Each share must be full or half."
     return None
+
+
+def strip_quantity(name: str, quantity: int) -> str:
+    """"Kingfisher x2" -> "Kingfisher" when 2 were ordered, because the quantity is kept
+    separately. Also handles "2 x Kingfisher" and "Kingfisher × 2"."""
+    if quantity > 1:
+        stripped = re.sub(rf"\s*[x×*]\s*{quantity}$", "", name, flags=re.IGNORECASE)
+        stripped = re.sub(rf"^{quantity}\s*[x×*]\s*", "", stripped, flags=re.IGNORECASE)
+        return stripped.strip() or name  # never leave an empty name
+    return name
+
+
+def item_label(item: LineItem) -> str:
+    """How an item is shown to people: "Cold Coffee ×3", or just "Biryani" for one."""
+    return f"{item['name']} ×{item['quantity']}" if item["quantity"] > 1 else item["name"]
 
 
 def receipt_total(receipt: Receipt) -> int:

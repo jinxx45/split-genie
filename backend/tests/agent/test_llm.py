@@ -25,7 +25,7 @@ def test_reading_is_converted_to_paise_and_charges_are_grouped():
         place=" Hotel Saravana ",
         items=[
             ReadLine(name="Chicken Biryani", amount="600.00", quantity=1, category="food"),
-            ReadLine(name="Kingfisher x2", amount="400.00", quantity=2, category="alcohol"),
+            ReadLine(name="Kingfisher x2", amount="400.00", quantity=2, category="alcohol"),  # kept "x2"
         ],
         charges=[
             ReadCharge(label="CGST 2.5%", amount="25.00", kind="tax"),
@@ -39,7 +39,7 @@ def test_reading_is_converted_to_paise_and_charges_are_grouped():
     receipt = reading_to_receipt(reading)
 
     assert receipt["items"][1] == {
-        "name": "Kingfisher x2",
+        "name": "Kingfisher",  # the quantity lives in its own field
         "amount_paise": 40000,
         "category": "alcohol",
         "quantity": 2,
@@ -74,8 +74,8 @@ def person_share(name, share, count=0):
 
 ITEMS = [
     {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food", "quantity": 1},
-    {"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol", "quantity": 2},
-    {"name": "Filter Coffee x1", "amount_paise": 9500, "category": "drink", "quantity": 1},
+    {"name": "Kingfisher", "amount_paise": 40000, "category": "alcohol", "quantity": 2},
+    {"name": "Filter Coffee", "amount_paise": 9500, "category": "drink", "quantity": 1},
 ]
 
 
@@ -165,11 +165,11 @@ def test_read_receipt_sends_the_photo_and_any_feedback(tmp_path, monkeypatch):
 def test_suggest_assignments_never_sends_prices(monkeypatch):
     fake = FakeGemini(AssignmentSuggestions(exceptions=[]))
     monkeypatch.setattr(llm, "gemini", lambda: fake)
-    items = [{"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol", "quantity": 2}]
+    items = [{"name": "Kingfisher", "amount_paise": 40000, "category": "alcohol", "quantity": 2}]
 
     llm.suggest_assignments(PEOPLE, "Ravi doesn't drink", items)
 
-    assert "Kingfisher x2 (alcohol, quantity 2)" in fake.sent
+    assert "Kingfisher (alcohol, quantity 2)" in fake.sent
     assert "400" not in fake.sent
 
 
@@ -177,7 +177,7 @@ SHARED = {"weights": {"Arun": FULL, "Priya": FULL}, "by_count": False}
 ASSIGNED = [
     {"receipt": 0, "item": 0, "name": "Chicken Biryani", "quantity": 1, **SHARED},
     {"receipt": 0, "item": 1, "name": "Gulab Jamun", "quantity": 1, **SHARED},
-    {"receipt": 0, "item": 2, "name": "Cold Coffee x3", "quantity": 3, **SHARED},
+    {"receipt": 0, "item": 2, "name": "Cold Coffee", "quantity": 3, **SHARED},
 ]
 
 
@@ -223,12 +223,12 @@ def test_correct_assignments_lists_items_with_ids_and_people_but_no_prices(monke
     items = [
         {"receipt": 0, "item": 1, "name": "Gulab Jamun", "quantity": 1,
          "weights": {"Arun": FULL, "Priya": HALF}, "by_count": False},
-        {"receipt": 0, "item": 2, "name": "Cold Coffee x3", "quantity": 3,
+        {"receipt": 0, "item": 2, "name": "Cold Coffee", "quantity": 3,
          "weights": {"Arun": 2, "Priya": 1}, "by_count": True},
     ]
 
     llm.correct_assignments(PEOPLE, items, "Priya didn't have dessert")
 
     assert "0.1 Gulab Jamun (quantity 1): Arun, Priya (half)" in fake.sent
-    assert "0.2 Cold Coffee x3 (quantity 3): Arun had 2, Priya had 1" in fake.sent
+    assert "0.2 Cold Coffee (quantity 3): Arun had 2, Priya had 1" in fake.sent
     assert "Priya didn't have dessert" in fake.sent

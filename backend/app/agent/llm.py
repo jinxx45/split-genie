@@ -23,6 +23,7 @@ from app.agent.receipt import (
     Suggestion,
     assignment_problem,
     default_suggestion,
+    strip_quantity,
     to_paise,
 )
 from app.config import settings
@@ -32,7 +33,7 @@ from app.money.split import FULL, HALF
 
 
 class ReadLine(BaseModel):
-    name: str = Field(description="Item name as printed, keeping quantities, e.g. 'Kingfisher x2'")
+    name: str = Field(description="Item name as printed, without the quantity, e.g. 'Kingfisher' for 'Kingfisher x2'")
     amount: str = Field(description="The line total exactly as printed, e.g. '400.00'")
     quantity: int = Field(description="How many were ordered, e.g. 2 for 'Kingfisher x2'; 1 if not shown")
     category: Category
@@ -97,15 +98,17 @@ def amount_or_zero(amount: str) -> int:
 
 
 def reading_to_receipt(reading: ReceiptReading) -> Receipt:
-    items: list[LineItem] = [
-        {
-            "name": line.name,
-            "amount_paise": amount_or_zero(line.amount),
-            "category": line.category,
-            "quantity": max(line.quantity, 1),  # never 0 or negative, whatever was read
-        }
-        for line in reading.items
-    ]
+    items: list[LineItem] = []
+    for line in reading.items:
+        quantity = max(line.quantity, 1)  # never 0 or negative, whatever was read
+        items.append(
+            {
+                "name": strip_quantity(line.name.strip(), quantity),  # in case Gemini kept "x2"
+                "amount_paise": amount_or_zero(line.amount),
+                "category": line.category,
+                "quantity": quantity,
+            }
+        )
     service_charge = 0
     tax = 0  # taxes plus adjustments (round-off, discounts): both are split in proportion
     for charge in reading.charges:
@@ -188,9 +191,9 @@ def to_corrections(
 
 READ_PROMPT = """You are reading a photo of a restaurant or shop bill from India.
 
-List every ordered line with its name as printed (keep quantities such as "x2"), its line
-total as printed, how many were ordered (the quantity: 1 if the bill doesn't show one), and a
-category: food, drink (non-alcoholic), alcohol (beer, wine, spirits,
+List every ordered line with its name as printed (without the quantity), its line total as
+printed, how many were ordered (the quantity, e.g. 2 for "Kingfisher x2" or a Qty column of 2;
+1 if the bill doesn't show one), and a category: food, drink (non-alcoholic), alcohol (beer, wine, spirits,
 cocktails) or dessert.
 
 List every charge below the items separately, exactly as printed: each tax line (CGST, SGST,

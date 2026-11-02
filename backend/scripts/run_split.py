@@ -17,7 +17,7 @@ from langgraph.types import Command
 
 from app.agent import llm
 from app.agent.graph import build_graph, new_split
-from app.agent.receipt import Assignment, format_rupees, to_paise
+from app.agent.receipt import Assignment, format_rupees, item_label, to_paise
 from app.config import settings
 from app.money.split import FULL, HALF
 from app.observability import configure_logging, enable_langsmith_if_configured
@@ -87,7 +87,7 @@ def ask_confirm(question: dict) -> dict:
     receipt = question["receipt"]
     print("\n── Check the items ──")
     for index, item in enumerate(receipt["items"]):
-        print(f"  {index}. {item['name']:<32} {format_rupees(item['amount_paise']):>11}  {item['category']}")
+        print(f"  {index}. {item_label(item):<32} {format_rupees(item['amount_paise']):>11}  {item['category']}")
     print(f"  Tax and adjustments {format_rupees(receipt['tax_paise']):>24}")
     print(f"  Service charge      {format_rupees(receipt['service_charge_paise']):>24}")
     if not question["totals_match"]:
@@ -101,12 +101,12 @@ def ask_review(question: dict, people: list[str]) -> dict:
     for entry in question["items"]:
         who = llm.describe_people(entry["suggested"]) or "❓"
         flag = "  ← please answer" if entry["needs_answer"] else ""
-        print(f"  {entry['index']}. {entry['item']['name']:<32} {who:<30} {entry['reason']}{flag}")
+        print(f"  {entry['index']}. {item_label(entry['item']):<32} {who:<30} {entry['reason']}{flag}")
 
     changes: dict[str, Assignment] = {}
     for entry in question["items"]:
         if entry["needs_answer"]:
-            changes[str(entry["index"])] = read_people(f"Who had {entry['item']['name']}? ", people)
+            changes[str(entry["index"])] = read_people(f"Who had {item_label(entry['item'])}? ", people)
 
     print("To change another item, type its number. Press Enter when everything is right.")
     while choice := input("Item number: ").strip():

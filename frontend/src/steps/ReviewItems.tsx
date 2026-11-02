@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import type { Assignment, Question, ReviewItem } from '../api'
+import { itemLabel } from '../items'
 import { formatRupees } from '../money'
 import type { StepProps } from '../pages/SplitPage'
 import { Avatar, ErrorText, PrimaryButton, Screen, ShareChip } from '../ui'
@@ -81,7 +82,7 @@ function ItemCard(props: {
   return (
     <li className={`rounded-2xl p-4 transition-colors ${unfinished ? 'bg-turmeric-soft ring-2 ring-turmeric' : 'bg-white'}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-semibold">{entry.item.name}</span>
+        <span className="font-semibold">{itemLabel(entry.item)}</span>
         <span className="amount">{formatRupees(entry.item.amount_paise)}</span>
       </div>
       <p className="text-sm text-muted">{entry.reason}</p>

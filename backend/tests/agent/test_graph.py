@@ -49,7 +49,7 @@ def test_full_dinner_flow_pauses_three_times_then_settles():
     question = paused_at(graph, config)
     assert question["step"] == "review_assignments"
     assert len(question["items"]) == 3
-    assert [i["item"]["name"] for i in question["items"] if i["needs_answer"]] == ["Kingfisher x2"]
+    assert [i["item"]["name"] for i in question["items"] if i["needs_answer"]] == ["Kingfisher"]
     answer(graph, config, {"changes": {"1": {"weights": {"arun": FULL, "ravi": FULL}, "by_count": False}}})
 
     # Pause 3: who paid

@@ -7,7 +7,7 @@ DINNER: Receipt = {
     "place": "Hotel Saravana",
     "items": [
         {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food", "quantity": 1},
-        {"name": "Kingfisher x2", "amount_paise": 40000, "category": "alcohol", "quantity": 2},
+        {"name": "Kingfisher", "amount_paise": 40000, "category": "alcohol", "quantity": 2},
         {"name": "Gulab Jamun", "amount_paise": 12000, "category": "dessert", "quantity": 1},
     ],
     "tax_paise": 5600,
@@ -19,7 +19,7 @@ LUNCH: Receipt = {
     "place": "Murugan Idli Shop",
     "items": [
         {"name": "Meals", "amount_paise": 36000, "category": "food", "quantity": 1},
-        {"name": "Filter Coffee x3", "amount_paise": 9000, "category": "drink", "quantity": 3},
+        {"name": "Filter Coffee", "amount_paise": 9000, "category": "drink", "quantity": 3},
     ],
     "tax_paise": 2250,
     "service_charge_paise": 0,

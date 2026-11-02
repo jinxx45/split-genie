@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, StrictBool
 
-from app.agent.receipt import Category, LineItem, assignment_problem, format_rupees
+from app.agent.receipt import Category, LineItem, assignment_problem, format_rupees, item_label
 
 MAX_PEOPLE = 20
 MAX_NAME_LENGTH = 40
@@ -97,7 +97,7 @@ def check_review(review: ReviewIn, people: list[str], items: list[LineItem]) -> 
             raise reject(f"Not in this split: {', '.join(unknown)}.")
         problem = assignment_problem(assignment.model_dump(), items[index]["quantity"])
         if problem:
-            raise reject(f"{items[index]['name']}: {problem}")
+            raise reject(f"{item_label(items[index])}: {problem}")
 
 
 def check_payers(payer: PayerIn, people: list[str], total_paise: int) -> None:

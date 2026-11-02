@@ -27,6 +27,7 @@ from app.agent.receipt import (
     assignment_problem,
     default_suggestion,
     format_rupees,
+    item_label,
     receipt_total,
     totals_match,
 )
@@ -272,7 +273,7 @@ def apply_correction(state: SplitState, correct_assignments: CorrectAssignments)
         done = finished[correction["receipt"]]
         changes.append(
             {
-                "item": done["receipt"]["items"][correction["item"]]["name"],
+                "item": item_label(done["receipt"]["items"][correction["item"]]),
                 "before": done["assignments"][correction["item"]],
                 "after": {"weights": correction["weights"], "by_count": correction["by_count"]},
             }
@@ -310,7 +311,7 @@ def to_bill(done: FinishedReceipt) -> Bill:
     receipt = done["receipt"]
     return Bill(
         items=[
-            Item(item["name"], item["amount_paise"], assignment["weights"], assignment["by_count"])
+            Item(item_label(item), item["amount_paise"], assignment["weights"], assignment["by_count"])
             for item, assignment in zip(receipt["items"], done["assignments"])
         ],
         tax_paise=receipt["tax_paise"],
