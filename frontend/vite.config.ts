@@ -8,7 +8,8 @@ export default defineConfig({
   server: {
     // Forward /api calls to the FastAPI dev server, so the browser sees one origin and no CORS setup is needed.
     proxy: {
-      '/api': 'http://localhost:8000',
+      // 127.0.0.1, not localhost: Node may look up localhost as IPv6 (::1), but uvicorn listens on IPv4.
+      '/api': 'http://127.0.0.1:8000',
     },
   },
 })
