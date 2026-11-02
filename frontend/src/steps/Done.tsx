@@ -1,40 +1,53 @@
 // The finished split, in two views:
-// - the person who split it: a summary, then a WhatsApp request for each friend who owes money;
-// - a friend opening that request (?for=Arun): their own share first, with a UPI pay button.
+// - the person who split it: a summary, then each payment with a WhatsApp request, and whether
+//   it has been paid;
+// - a friend opening that request (?for=Arun): their own share first, with a UPI pay button and
+//   "I've paid".
 
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
-import type { Payment, Split } from '../api'
+import type { Payment, PaymentMark, Split } from '../api'
 import { formatRupees, toRupeesText } from '../money'
-import { Paper, Screen } from '../ui'
+import { ErrorText, Paper, Screen } from '../ui'
 import { BreakdownList, BreakdownPaper, Payments } from './Summary'
 
 type Result = NonNullable<Split['result']>
-type Props = { result: Result; people: string[] }
+type Base = { result: Result; people: string[] }
+type Props = Base & { onMark: (mark: PaymentMark) => void; busy: boolean; error: string | null }
 
 // A UPI ID looks like name@bank.
 const UPI_ID = /^[\w.-]{2,256}@[a-zA-Z]{2,64}$/
 
-export function Done({ result, people }: Props) {
+export function Done(props: Props) {
   const [params] = useSearchParams()
   const friend = params.get('for')
-  if (friend && people.includes(friend)) {
-    return <FriendView friend={friend} result={result} people={people} upiIds={readUpiIds(params)} />
+  if (friend && props.people.includes(friend)) {
+    return <FriendView {...props} friend={friend} upiIds={readUpiIds(params)} />
   }
-  return <SplitterView result={result} people={people} />
+  return <SplitterView {...props} />
 }
 
-function SplitterView({ result, people }: Props) {
-  const receivers = [...new Set(result.payments.map((payment) => payment.receiver))]
+function SplitterView({ result, people, onMark, busy, error }: Props) {
+  // Only people still waiting on money need their UPI ID in the requests.
+  const waiting = result.payments.filter((payment) => !payment.marked_paid_by)
+  const receivers = [...new Set(waiting.map((payment) => payment.receiver))]
   const [typedIds, setTypedIds] = useState<Record<string, string>>({})
   const upiIds = validUpiIds(typedIds)
+  const paidCount = result.payments.filter((payment) => payment.marked_paid_by).length
 
   return (
     <Screen title="Split done">
       <BillSummary result={result} people={people} />
 
       {result.payments.length > 0 && (
-        <h2 className="mt-8 mb-3 font-display text-xl font-semibold">Send each friend their share</h2>
+        <>
+          <h2 className="mt-8 font-display text-xl font-semibold">Send each friend their share</h2>
+          <p className="mb-3 text-muted">
+            {paidCount === result.payments.length
+              ? 'Everyone has paid.'
+              : `${paidCount} of ${result.payments.length} paid`}
+          </p>
+        </>
       )}
       {receivers.map((receiver) => (
         <label key={receiver} className="mb-3 block rounded-2xl bg-white p-4">
@@ -52,17 +65,33 @@ function SplitterView({ result, people }: Props) {
       <Payments
         payments={result.payments}
         people={people}
-        action={(payment) => (
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(requestMessage(payment, result.title, upiIds))}`}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 block rounded-xl bg-steel py-2.5 text-center font-display font-semibold"
-          >
-            Send to {payment.sender} on WhatsApp
-          </a>
-        )}
+        action={(payment) =>
+          payment.marked_paid_by ? (
+            // The person being paid can undo a mistaken mark.
+            <PaidRow payment={payment} busy={busy} onUndo={() => onMark(markFor(payment, false, payment.receiver))} />
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(requestMessage(payment, result.title, upiIds))}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 rounded-xl bg-steel py-2.5 text-center font-display font-semibold"
+              >
+                Send on WhatsApp
+              </a>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onMark(markFor(payment, true, payment.receiver))}
+                className="rounded-xl px-3 font-display font-semibold text-muted"
+              >
+                Mark paid
+              </button>
+            </div>
+          )
+        }
       />
+      {error && <ErrorText>{error}</ErrorText>}
 
       <h2 className="mt-8 mb-3 font-display text-xl font-semibold">How it adds up</h2>
       <BreakdownList breakdown={result.breakdown} people={people} />
@@ -70,9 +99,12 @@ function SplitterView({ result, people }: Props) {
   )
 }
 
-function FriendView({ friend, result, people, upiIds }: Props & { friend: string; upiIds: Record<string, string> }) {
+function FriendView(props: Props & { friend: string; upiIds: Record<string, string> }) {
+  const { friend, result, people, upiIds, onMark, busy, error } = props
   const mine = result.payments.filter((payment) => payment.sender === friend || payment.receiver === friend)
-  const payable = mine.filter((payment) => payment.sender === friend && upiIds[payment.receiver])
+  const payable = mine.filter(
+    (payment) => payment.sender === friend && !payment.marked_paid_by && upiIds[payment.receiver],
+  )
   const part = result.breakdown[friend]
 
   return (
@@ -95,10 +127,28 @@ function FriendView({ friend, result, people, upiIds }: Props & { friend: string
       }
     >
       {mine.length > 0 ? (
-        <Payments payments={mine} people={people} />
+        <Payments
+          payments={mine}
+          people={people}
+          action={(payment) =>
+            payment.marked_paid_by ? (
+              <PaidRow payment={payment} busy={busy} onUndo={() => onMark(markFor(payment, false, friend))} />
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onMark(markFor(payment, true, friend))}
+                className="mt-3 w-full rounded-xl bg-steel py-2.5 font-display font-semibold"
+              >
+                {payment.sender === friend ? 'I’ve paid' : `${payment.sender} paid me`}
+              </button>
+            )
+          }
+        />
       ) : (
         <p className="rounded-2xl bg-white p-4">You’re all square. Nothing to pay.</p>
       )}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {part && (
         <>
@@ -116,8 +166,27 @@ function FriendView({ friend, result, people, upiIds }: Props & { friend: string
   )
 }
 
+/** A paid payment: who marked it, and a way to undo a mistake. */
+function PaidRow({ payment, busy, onUndo }: { payment: Payment; busy: boolean; onUndo: () => void }) {
+  return (
+    <div className="mt-3 flex items-center justify-between rounded-xl bg-steel px-3 py-2.5">
+      <span className="font-display font-semibold">
+        ✓ Paid
+        <span className="font-body font-normal text-muted"> (marked by {payment.marked_paid_by})</span>
+      </span>
+      <button type="button" disabled={busy} onClick={onUndo} className="text-sm font-semibold text-muted">
+        Undo
+      </button>
+    </div>
+  )
+}
+
+function markFor(payment: Payment, paid: boolean, by: string): PaymentMark {
+  return { sender: payment.sender, receiver: payment.receiver, paid, by }
+}
+
 /** The bill at a glance: where, how much, how many people, who paid. */
-function BillSummary({ result, people }: Props) {
+function BillSummary({ result, people }: Base) {
   return (
     <Paper>
       <div className="text-center">

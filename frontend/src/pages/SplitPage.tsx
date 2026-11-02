@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
-import { ApiError, answerSplit, getSplit, retrySplit } from '../api'
-import type { Split } from '../api'
+import { ApiError, answerSplit, getSplit, markPayment, retrySplit } from '../api'
+import type { PaymentMark, Split } from '../api'
 import { Approve } from '../steps/Approve'
 import { ConfirmItems } from '../steps/ConfirmItems'
 import { Done } from '../steps/Done'
@@ -36,13 +36,23 @@ export function SplitPage() {
       .catch((problem) => setError(message(problem)))
   }, [id])
 
-  async function send(call: () => Promise<Split>) {
+  // Coming back to the tab (say, from WhatsApp or a UPI app): reload, so payments marked by
+  // friends in the meantime show up.
+  useEffect(() => {
+    function reload() {
+      if (document.visibilityState === 'visible') getSplit(id).then(setSplit).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', reload)
+    return () => document.removeEventListener('visibilitychange', reload)
+  }, [id])
+
+  async function send(call: () => Promise<Split>, scrollToTop = true) {
     setBusy(true)
     setError(null)
     try {
       setSplit(await call())
       setVersion((current) => current + 1)
-      window.scrollTo({ top: 0 })
+      if (scrollToTop) window.scrollTo({ top: 0 })
     } catch (problem) {
       setError(message(problem))
     } finally {
@@ -63,7 +73,8 @@ export function SplitPage() {
   }
 
   if (split.status === 'done' && split.result) {
-    return <Done result={split.result} people={split.people} />
+    const mark = (body: PaymentMark) => send(() => markPayment(id, body), false)
+    return <Done result={split.result} people={split.people} onMark={mark} busy={busy} error={error} />
   }
 
   if (split.status === 'failed' || !split.question) {

@@ -25,7 +25,13 @@ export type ItemShare = {
   count: number | null // how many they had, when the item is split by count
 }
 export type Breakdown = { items: ItemShare[]; charges_paise: number; total_paise: number }
-export type Payment = { sender: string; receiver: string; amount_paise: number }
+export type Payment = {
+  sender: string
+  receiver: string
+  amount_paise: number
+  marked_paid_by?: string | null // on a finished split: who marked it paid; null = still waiting
+}
+export type PaymentMark = { sender: string; receiver: string; paid: boolean; by: string }
 export type Change = { item: string; before: Assignment; after: Assignment }
 
 export type ReviewItem = {
@@ -96,3 +102,4 @@ export const getSplit = (id: string) => request(`/api/splits/${id}`)
 export const answerSplit = (id: string, answer: unknown) =>
   request(`/api/splits/${id}/answer`, json(answer))
 export const retrySplit = (id: string) => request(`/api/splits/${id}/retry`, { method: 'POST' })
+export const markPayment = (id: string, mark: PaymentMark) => request(`/api/splits/${id}/payments`, json(mark))

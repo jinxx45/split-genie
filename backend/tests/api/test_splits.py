@@ -6,6 +6,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.graph import build_graph
 from app.api import splits
+from app.api.payments import PaymentStore
 from app.api.splits import bill_summary
 from app.main import app
 from tests.agent import fakes
@@ -22,7 +23,9 @@ def client(tmp_path, monkeypatch):
     graph = build_graph(
         InMemorySaver(), fakes.read_receipt, fakes.suggest_assignments, fakes.correct_assignments
     )
+    payments = PaymentStore(tmp_path / "payments.db")
     app.dependency_overrides[splits.get_graph] = lambda: graph
+    app.dependency_overrides[splits.get_payments] = lambda: payments
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -254,3 +257,58 @@ def test_light_eaters_must_be_in_the_split(client):
 
     assert response.status_code == 422
     assert "Not in this split: Rahul" in response.json()["detail"]
+
+
+# --- Who has paid ---
+
+
+def finished_split(client) -> str:
+    """Dinner: Arun and Ravi had the beer, Priya paid. Arun and Ravi each owe Priya."""
+    split_id = to_payer_step(client)
+    answer(client, split_id, {"paid": {"Priya": 123200}})
+    answer(client, split_id, {"approved": True})
+    return split_id
+
+
+def mark(client, split_id, sender, paid=True, by=None):
+    body = {"sender": sender, "receiver": "Priya", "paid": paid, "by": by or sender}
+    return client.post(f"/api/splits/{split_id}/payments", json=body)
+
+
+def paid_by(split: dict) -> dict:
+    return {payment["sender"]: payment["marked_paid_by"] for payment in split["result"]["payments"]}
+
+
+def test_payments_start_as_waiting(client):
+    split = client.get(f"/api/splits/{finished_split(client)}").json()
+
+    assert paid_by(split) == {"Arun": None, "Ravi": None}
+
+
+def test_a_friend_marks_their_payment_paid_and_can_undo_it(client):
+    split_id = finished_split(client)
+
+    assert paid_by(mark(client, split_id, "Arun").json()) == {"Arun": "Arun", "Ravi": None}
+    assert paid_by(client.get(f"/api/splits/{split_id}").json())["Arun"] == "Arun"  # saved
+
+    assert paid_by(mark(client, split_id, "Arun", paid=False).json()) == {"Arun": None, "Ravi": None}
+
+
+def test_the_person_paid_can_mark_it_too(client):
+    split_id = finished_split(client)
+
+    assert paid_by(mark(client, split_id, "Ravi", by="Priya").json())["Ravi"] == "Priya"
+
+
+def test_payments_can_only_be_marked_on_a_finished_split(client):
+    split_id = to_payer_step(client)
+
+    assert mark(client, split_id, "Arun").status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("sender", "by", "status"),
+    [("Priya", "Priya", 404), ("Rahul", "Rahul", 404), ("Arun", "Rahul", 422)],
+)
+def test_marking_an_unknown_payment_or_by_an_outsider_is_rejected(client, sender, by, status):
+    assert mark(client, finished_split(client), sender, by=by).status_code == status

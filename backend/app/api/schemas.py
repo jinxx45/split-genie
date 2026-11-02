@@ -71,6 +71,15 @@ class ApprovalIn(BaseModel):
     note: str | None = Field(default=None, max_length=2 * MAX_NOTE_LENGTH)
 
 
+class PaymentMarkIn(BaseModel):
+    """Mark one payment of a finished split as paid (or back to waiting)."""
+
+    sender: str
+    receiver: str
+    paid: StrictBool
+    by: str  # who is marking it: the payer ("I've paid") or the person paid ("Got it")
+
+
 def reject(message: str) -> HTTPException:
     """422 Unprocessable Content: the request was understood but its data can't be used."""
     return HTTPException(status_code=422, detail=message)

@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from app.agent import llm
 from app.agent.graph import build_graph, new_split
 from app.agent.receipt import receipt_total
+from app.api.payments import PaymentStore
 from app.api.schemas import (
     MAX_NOTE_LENGTH,
     MAX_PHOTO_BYTES,
@@ -24,6 +25,7 @@ from app.api.schemas import (
     PHOTO_TYPES,
     ApprovalIn,
     PayerIn,
+    PaymentMarkIn,
     ReceiptIn,
     ReviewIn,
     check_payers,
@@ -47,6 +49,12 @@ def get_graph():
     )
 
 
+@lru_cache
+def get_payments() -> PaymentStore:
+    """Who has paid, kept in the same SQLite file. Tests replace this with a temporary one."""
+    return PaymentStore(settings.database_path)
+
+
 # --- Endpoints ---
 
 
@@ -56,6 +64,7 @@ def create_split(
     note: str = Form("", max_length=MAX_NOTE_LENGTH),
     photos: list[UploadFile] = File(...),
     graph=Depends(get_graph),
+    payments=Depends(get_payments),
 ) -> dict:
     """Start a split from receipt photos. Reads the first receipt, then returns its first question."""
     people = clean_people(people)
@@ -65,17 +74,19 @@ def create_split(
 
     split_id = secrets.token_urlsafe(9)  # 12 characters, unguessable: the link is the access
     run(graph, split_id, new_split(people, note.strip(), receipt_ids))
-    return describe(graph, split_id)
+    return describe(graph, payments, split_id)
 
 
 @router.get("/{split_id}")
-def get_split(split_id: str, graph=Depends(get_graph)) -> dict:
+def get_split(split_id: str, graph=Depends(get_graph), payments=Depends(get_payments)) -> dict:
     """Where a split is now. Used when someone opens or reopens a split's link."""
-    return describe(graph, split_id)
+    return describe(graph, payments, split_id)
 
 
 @router.post("/{split_id}/answer")
-def answer_split(split_id: str, body: dict[str, Any], graph=Depends(get_graph)) -> dict:
+def answer_split(
+    split_id: str, body: dict[str, Any], graph=Depends(get_graph), payments=Depends(get_payments)
+) -> dict:
     """Answer the question the split is waiting on, after checking the answer fits that question."""
     state = load(graph, split_id)
     if not state.interrupts:
@@ -83,17 +94,41 @@ def answer_split(split_id: str, body: dict[str, Any], graph=Depends(get_graph)) 
     question = state.interrupts[0].value
 
     run(graph, split_id, Command(resume=checked_answer(question, body, state.values)))
-    return describe(graph, split_id)
+    return describe(graph, payments, split_id)
 
 
 @router.post("/{split_id}/retry")
-def retry_split(split_id: str, graph=Depends(get_graph)) -> dict:
+def retry_split(split_id: str, graph=Depends(get_graph), payments=Depends(get_payments)) -> dict:
     """Run the step that failed again (for example after Gemini was briefly unavailable)."""
     state = load(graph, split_id)
     if state.interrupts or not state.next:
         raise HTTPException(status_code=409, detail="Nothing to retry.")
     run(graph, split_id, None)  # None: carry on from where the split stopped
-    return describe(graph, split_id)
+    return describe(graph, payments, split_id)
+
+
+@router.post("/{split_id}/payments")
+def mark_payment(
+    split_id: str, mark: PaymentMarkIn, graph=Depends(get_graph), payments=Depends(get_payments)
+) -> dict:
+    """Mark one payment of a finished split as paid, or back to waiting."""
+    state = load(graph, split_id)
+    if state.interrupts or state.next:
+        raise HTTPException(status_code=409, detail="This split isn't finished yet.")
+    values = state.values
+    if not any(
+        payment["sender"] == mark.sender and payment["receiver"] == mark.receiver
+        for payment in values["payments"]
+    ):
+        raise HTTPException(status_code=404, detail=f"{mark.sender} doesn't pay {mark.receiver} in this split.")
+    if mark.by not in values["people"]:
+        raise reject(f"Not in this split: {mark.by}.")
+
+    if mark.paid:
+        payments.mark_paid(split_id, mark.sender, mark.receiver, mark.by)
+    else:
+        payments.mark_unpaid(split_id, mark.sender, mark.receiver)
+    return describe(graph, payments, split_id)
 
 
 # --- Helpers ---
@@ -122,8 +157,9 @@ def run(graph, split_id: str, graph_input) -> None:
         ) from None
 
 
-def describe(graph, split_id: str) -> dict:
-    """The split as the app sees it: waiting on a question, failed (retry), or done."""
+def describe(graph, payments: PaymentStore, split_id: str) -> dict:
+    """The split as the app sees it: waiting on a question, failed (retry), or done. A done
+    split's payments say who marked each one paid (None: still waiting)."""
     state = load(graph, split_id)
     values = state.values
     if state.interrupts:
@@ -135,11 +171,15 @@ def describe(graph, split_id: str) -> dict:
 
     result = None
     if status == "done":
+        marked = payments.marked(split_id)
         result = {
             **bill_summary(values["finished"]),
             "shares": values["shares"],
             "breakdown": values["breakdown"],
-            "payments": values["payments"],
+            "payments": [
+                {**payment, "marked_paid_by": marked.get((payment["sender"], payment["receiver"]))}
+                for payment in values["payments"]
+            ],
         }
     return {
         "id": split_id,
