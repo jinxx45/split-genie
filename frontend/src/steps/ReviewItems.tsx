@@ -1,7 +1,8 @@
 // Step 2: who had what. Every item, with the people Split Genie suggests.
 // Shared items: tap a name to change their share. Items ordered several times ("Cold Coffee x3")
 // can instead be split by count: who had how many. Unfinished items are highlighted.
-// At the top, "Anyone eat less?" gives a person half a share of every shared food item in one tap.
+// At the top, "Ask friends" sends each friend a link to tap what they had, and "Anyone eat less?"
+// gives a person half a share of every shared food item in one tap.
 
 import { useState } from 'react'
 import type { Assignment, Item, Question, ReviewItem } from '../api'
@@ -27,6 +28,11 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
     setAssignments(assignments.map((current, i) => (i === index ? assignment : current)))
   }
 
+  function applyClaims() {
+    // The server has already merged the claims into the suggestions (apply_claims).
+    setAssignments(question.claimed)
+  }
+
   const unfinished = question.items.filter((entry, index) => !isFinished(assignments[index], entry.item.quantity)).length
 
   function submit() {
@@ -49,6 +55,7 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
         </PrimaryButton>
       }
     >
+      <AskFriends people={people} place={question.place} claims={question.claims} onUse={applyClaims} />
       <LightEaters people={people} lightEaters={lightEaters} onToggle={toggleLightEater} />
       <p className="mb-5 text-muted">Tap a name: once for a full share, again for half, again to remove.</p>
       <ul className="space-y-3">
@@ -64,6 +71,61 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
       </ul>
       {error && <ErrorText>{error}</ErrorText>}
     </Screen>
+  )
+}
+
+/** Send each friend a link to tap what they had, see who has answered, and use their answers. */
+function AskFriends(props: {
+  people: string[]
+  place: string
+  claims: Record<string, Record<string, number>>
+  onUse: () => void
+}) {
+  const { people, place, claims, onUse } = props
+  const answered = people.filter((person) => claims[person] !== undefined)
+
+  function linkFor(person: string): string {
+    const link = `${window.location.origin}${window.location.pathname}?${new URLSearchParams({ for: person })}`
+    const message = `Splitting the bill${place ? ` for ${place}` : ''}. Tap what you had:\n${link}`
+    return `https://wa.me/?text=${encodeURIComponent(message)}`
+  }
+
+  return (
+    <details open={answered.length > 0} className="group mb-3 rounded-2xl bg-white p-4">
+      <summary className="flex cursor-pointer list-none items-center justify-between font-display text-lg font-semibold">
+        Ask friends what they had
+        <span aria-hidden className="text-muted transition group-open:rotate-180">⌄</span>
+      </summary>
+      <p className="text-sm text-muted">Each friend gets a link to tap their items. You check before anything is final.</p>
+      <ul className="mt-3 divide-y divide-steel">
+        {people.map((person) => (
+          <li key={person} className="flex items-center gap-3 py-2">
+            <Avatar name={person} color={personColor(people, person)} />
+            <span className="flex-1">
+              <span className="font-semibold">{person}</span>
+              <span className="block text-sm text-muted">{claims[person] ? '✓ Answered' : 'Waiting'}</span>
+            </span>
+            <a
+              href={linkFor(person)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-steel px-3 py-2 text-sm font-semibold"
+            >
+              {claims[person] ? 'Send again' : 'Send link'}
+            </a>
+          </li>
+        ))}
+      </ul>
+      {answered.length > 0 && (
+        <button
+          type="button"
+          onClick={onUse}
+          className="mt-3 w-full rounded-xl bg-brand py-2.5 font-display font-semibold text-white"
+        >
+          Use their answers ({answered.length} of {people.length})
+        </button>
+      )}
+    </details>
   )
 }
 

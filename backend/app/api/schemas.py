@@ -87,6 +87,14 @@ class PaymentMarkIn(BaseModel):
     by: str  # who is marking it: the payer ("I've paid") or the person paid ("Got it")
 
 
+class ClaimIn(BaseModel):
+    """A friend's answer to "what did you have?": {item index: weight}. Weight: FULL (2) or
+    HALF (1) for an item ordered once; how many they had for one ordered several times."""
+
+    person: str
+    items: dict[int, Annotated[int, Field(ge=1, le=MAX_QUANTITY)]]
+
+
 def reject(message: str) -> HTTPException:
     """422 Unprocessable Content: the request was understood but its data can't be used."""
     return HTTPException(status_code=422, detail=message)
@@ -118,6 +126,19 @@ def check_review(review: ReviewIn, people: list[str], items: list[LineItem]) -> 
         problem = assignment_problem(assignment.model_dump(), items[index]["quantity"])
         if problem:
             raise reject(f"{item_label(items[index])}: {problem}")
+
+
+def check_claim(claim: ClaimIn, people: list[str], items: list[LineItem]) -> None:
+    if claim.person not in people:
+        raise reject(f"Not in this split: {claim.person}.")
+    for index, weight in claim.items.items():
+        if not 0 <= index < len(items):
+            raise reject(f"There is no item {index}.")
+        quantity = items[index]["quantity"]
+        if quantity == 1 and weight not in (1, 2):
+            raise reject(f"{item_label(items[index])}: say whether you had it or had a little.")
+        if quantity > 1 and weight > quantity:
+            raise reject(f"{item_label(items[index])}: only {quantity} were ordered.")
 
 
 def check_payers(payer: PayerIn, people: list[str], total_paise: int) -> None:

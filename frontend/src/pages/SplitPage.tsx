@@ -1,11 +1,13 @@
 // One split, at /split/:id. Shows whichever screen the split is waiting on.
 // The server is the source of truth: after every answer we show what it sends back.
+// A friend's link (?for=Arun) shows their own screens: what they had, then what they owe.
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router'
-import { ApiError, answerSplit, getSplit, markPayment, retrySplit } from '../api'
+import { useParams, useSearchParams } from 'react-router'
+import { ApiError, answerSplit, claimItems, getSplit, markPayment, retrySplit } from '../api'
 import type { PaymentMark, Split } from '../api'
 import { Approve } from '../steps/Approve'
+import { ClaimItems } from '../steps/ClaimItems'
 import { ConfirmItems } from '../steps/ConfirmItems'
 import { Done } from '../steps/Done'
 import { ReviewItems } from '../steps/ReviewItems'
@@ -23,6 +25,7 @@ export type StepProps<Q> = {
 
 export function SplitPage() {
   const { id = '' } = useParams()
+  const [params, setParams] = useSearchParams()
   const [split, setSplit] = useState<Split | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -77,7 +80,36 @@ export function SplitPage() {
     return <Done result={split.result} people={split.people} onMark={mark} busy={busy} error={error} />
   }
 
-  if (!split.can_answer) {
+  const friend = params.get('for')
+  const isFriend = friend !== null && split.people.includes(friend)
+  const asking = split.question?.step === 'review_assignments' ? split.question : null
+
+  if (asking && isFriend) {
+    const claim = (items: Record<number, number>) => send(() => claimItems(id, friend, items))
+    return <ClaimItems key={version} question={asking} friend={friend} onClaim={claim} busy={busy} error={error} />
+  }
+
+  if (asking && !split.can_answer) {
+    return (
+      <Screen title="Who are you?">
+        <p className="mb-5 text-muted">Pick your name to tap what you had.</p>
+        <div className="flex flex-wrap gap-2">
+          {split.people.map((person) => (
+            <button
+              key={person}
+              type="button"
+              onClick={() => setParams({ for: person })}
+              className="rounded-full bg-white px-4 py-2 font-semibold"
+            >
+              {person}
+            </button>
+          ))}
+        </div>
+      </Screen>
+    )
+  }
+
+  if (isFriend || !split.can_answer) {
     return (
       <Screen title="This split isn’t finished yet">
         <p className="text-muted">The person who started it is still checking the bill. Open this link again once they’re done.</p>

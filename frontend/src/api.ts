@@ -44,7 +44,15 @@ export type ReviewItem = {
 
 export type Question =
   | { step: 'confirm_items'; receipt: Receipt; totals_match: boolean }
-  | { step: 'review_assignments'; people: string[]; items: ReviewItem[]; light_eaters: string[] }
+  | {
+      step: 'review_assignments'
+      people: string[]
+      items: ReviewItem[]
+      light_eaters: string[]
+      place: string
+      claims: Record<string, Record<string, number>> // friend -> {item index: weight}, from their links
+      claimed: Assignment[] // the suggestions updated with friends' claims, one per item
+    }
   | { step: 'payer'; people: string[]; total_paise: number }
   | {
       step: 'approve'
@@ -118,6 +126,8 @@ export const getSplit = (id: string) => request(`/api/splits/${id}`)
 export const answerSplit = (id: string, answer: unknown) =>
   request(`/api/splits/${id}/answer`, json(answer))
 export const retrySplit = (id: string) => request(`/api/splits/${id}/retry`, { method: 'POST' })
+export const claimItems = (id: string, person: string, items: Record<number, number>) =>
+  request(`/api/splits/${id}/claims`, json({ person, items }))
 export const markPayment = (id: string, mark: PaymentMark) => request(`/api/splits/${id}/payments`, json(mark))
 
 // --- Signing in, and the signed-in user's details ---

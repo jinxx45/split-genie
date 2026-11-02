@@ -1,5 +1,5 @@
 """The split endpoints: start a split, see where it is, answer its question, retry a failed step,
-mark payments, and list the signed-in user's splits.
+let friends claim what they had, mark payments, and list the signed-in user's splits.
 
 Every split is a LangGraph thread, saved in SQLite under its id, so a link can be reopened later.
 Signing in is optional; a split started while signed in can only be answered by its owner.
@@ -19,9 +19,10 @@ from pydantic import ValidationError
 
 from app.agent import llm
 from app.agent.graph import build_graph, new_split
-from app.agent.receipt import receipt_total
+from app.agent.receipt import apply_claims, receipt_total
 from app.api.accounts import AccountStore, User
 from app.api.auth import current_user, get_accounts, require_user
+from app.api.claims import ClaimStore
 from app.api.payments import PaymentStore
 from app.api.schemas import (
     MAX_NOTE_LENGTH,
@@ -29,10 +30,12 @@ from app.api.schemas import (
     MAX_PHOTOS,
     PHOTO_TYPES,
     ApprovalIn,
+    ClaimIn,
     PayerIn,
     PaymentMarkIn,
     ReceiptIn,
     ReviewIn,
+    check_claim,
     check_payers,
     check_review,
     clean_people,
@@ -60,12 +63,19 @@ def get_payments() -> PaymentStore:
     return PaymentStore(settings.database_path)
 
 
+@lru_cache
+def get_claims() -> ClaimStore:
+    """What friends say they had. Tests replace this with a temporary one."""
+    return ClaimStore(settings.database_path)
+
+
 @dataclass
 class Context:
-    """Everything an endpoint needs, as one dependency instead of four."""
+    """Everything an endpoint needs, as one dependency instead of five."""
 
     graph: Any
     payments: PaymentStore
+    claims: ClaimStore
     accounts: AccountStore
     user: User | None  # None: not signed in
 
@@ -73,10 +83,11 @@ class Context:
 def get_context(
     graph=Depends(get_graph),
     payments: PaymentStore = Depends(get_payments),
+    claims: ClaimStore = Depends(get_claims),
     accounts: AccountStore = Depends(get_accounts),
     user: User | None = Depends(current_user),
 ) -> Context:
-    return Context(graph, payments, accounts, user)
+    return Context(graph, payments, claims, accounts, user)
 
 
 # --- Endpoints ---
@@ -156,6 +167,19 @@ def retry_split(split_id: str, context: Context = Depends(get_context)) -> dict:
     return describe(context, split_id)
 
 
+@router.post("/{split_id}/claims")
+def claim_items(split_id: str, claim: ClaimIn, context: Context = Depends(get_context)) -> dict:
+    """A friend says what they had, while the split waits on "who had what". Anyone with the
+    link can: friends never need to sign in. The splitter decides whether to use the answers."""
+    state = load(context.graph, split_id)
+    if not state.interrupts or state.interrupts[0].value["step"] != "review_assignments":
+        raise HTTPException(status_code=409, detail="This split isn't asking who had what right now.")
+    values = state.values
+    check_claim(claim, values["people"], values["receipt"]["items"])
+    context.claims.save(split_id, values["current"], claim.person, claim.items)
+    return describe(context, split_id)
+
+
 @router.post("/{split_id}/payments")
 def mark_payment(split_id: str, mark: PaymentMarkIn, context: Context = Depends(get_context)) -> dict:
     """Mark one payment of a finished split as paid, or back to waiting. Anyone with the link can:
@@ -224,6 +248,13 @@ def describe(context: Context, split_id: str) -> dict:
     values = state.values
     if state.interrupts:
         status, question = "waiting", state.interrupts[0].value
+        if question["step"] == "review_assignments":
+            # Friends' answers so far, and the suggestions updated with them (used if the
+            # splitter taps "Use their answers").
+            claims = context.claims.claims(split_id, values["current"])
+            claimed = apply_claims(values["receipt"]["items"], values["assignments"], claims)
+            place = values["receipt"]["place"]
+            question = {**question, "place": place, "claims": claims, "claimed": claimed}
     elif state.next:
         status, question = "failed", None
     else:

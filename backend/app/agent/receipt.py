@@ -97,6 +97,32 @@ def eat_less(item: LineItem, assignment: Assignment, light_eaters: list[str]) ->
     return {"weights": weights, "by_count": False}
 
 
+def apply_claims(
+    items: list[LineItem], assignments: list[Assignment], claims: dict[str, dict[int, int]]
+) -> list[Assignment]:
+    """The suggested assignments, updated with what friends said they had.
+
+    claims: person -> {item index: weight}. For an item ordered once the weight is FULL ("had
+    it") or HALF ("had a little"); for one ordered several times it's how many they had, so a
+    claimed item is split by count. Only people who answered change: they're on exactly the
+    items they claimed. Everyone who hasn't answered (often the splitter) keeps the suggestion.
+    """
+    answered = set(claims)
+    merged: list[Assignment] = []
+    for index, (item, assignment) in enumerate(zip(items, assignments)):
+        claimed = {person: answer[index] for person, answer in claims.items() if index in answer}
+        by_count = item["quantity"] > 1 if claimed else assignment["by_count"]
+        # Keep the suggestion for people who haven't answered, unless the item changed between
+        # shared and by count: full/half shares can't be mixed with counts.
+        kept = {
+            person: weight
+            for person, weight in assignment["weights"].items()
+            if person not in answered and assignment["by_count"] == by_count
+        }
+        merged.append({"weights": kept | claimed, "by_count": by_count})
+    return merged
+
+
 def assignment_problem(assignment: Assignment, quantity: int) -> str | None:
     """Why an item's assignment isn't finished, in words for the user; None if it is."""
     weights = assignment["weights"]

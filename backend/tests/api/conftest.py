@@ -8,6 +8,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from app.agent.graph import build_graph
 from app.api import auth, splits
 from app.api.accounts import AccountStore
+from app.api.claims import ClaimStore
 from app.api.payments import PaymentStore
 from app.main import app
 from tests.agent import fakes
@@ -26,7 +27,9 @@ def client(tmp_path, monkeypatch):
     payments = PaymentStore(tmp_path / "test.db")
     accounts = AccountStore(tmp_path / "test.db")
     app.dependency_overrides[splits.get_graph] = lambda: graph
+    claims = ClaimStore(tmp_path / "test.db")
     app.dependency_overrides[splits.get_payments] = lambda: payments
+    app.dependency_overrides[splits.get_claims] = lambda: claims
     app.dependency_overrides[auth.get_accounts] = lambda: accounts
     app.dependency_overrides[auth.get_verifier] = lambda: fake_google
     yield TestClient(app)
