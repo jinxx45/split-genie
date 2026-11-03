@@ -1,11 +1,12 @@
-// Scan a bill, at /scan: what it's for, who was there, an optional note, and photos of the bill.
+// Scan a bill, at /scan: what it's for, who was there, an optional note, and photos of the bill
+// (usually already picked from the home screen).
 // Signed in, you're added for you and recent friends are a tap away. Opened as
 // /scan?group=<id>, it scans a bill into that group instead.
 
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
-import { ApiError, createSplit, getGroup } from '../api'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { ApiError, MAX_PHOTOS, createSplit, getGroup } from '../api'
 import type { Group } from '../api'
 import { rememberedMember } from '../groups'
 import { MemberToggles, PeoplePicker } from '../people'
@@ -18,7 +19,9 @@ export function NewSplit() {
   const [splitName, setSplitName] = useState('') // what the split is for
   const [people, setPeople] = useState<string[]>([])
   const [note, setNote] = useState('')
-  const [photos, setPhotos] = useState<File[]>([])
+  // Photos picked on the home screen arrive with the navigation; otherwise they're added here.
+  const location = useLocation()
+  const [photos, setPhotos] = useState<File[]>(() => (location.state as { photos?: File[] } | null)?.photos ?? [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [me] = useMe()
@@ -154,7 +157,7 @@ export function NewSplit() {
             accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             multiple
             className="sr-only"
-            onChange={(event) => setPhotos(Array.from(event.target.files ?? []).slice(0, 5))}
+            onChange={(event) => setPhotos(Array.from(event.target.files ?? []).slice(0, MAX_PHOTOS))}
           />
         </label>
 

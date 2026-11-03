@@ -126,6 +126,9 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 })
 
+/** Photos per split; the server allows the same. */
+export const MAX_PHOTOS = 5
+
 export function createSplit(
   name: string,
   people: string[],
