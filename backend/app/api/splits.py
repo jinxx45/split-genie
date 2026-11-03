@@ -19,7 +19,7 @@ from langgraph.types import Command
 from pydantic import ValidationError
 
 from app.agent import llm
-from app.agent.graph import build_graph, new_split
+from app.agent.graph import build_graph, instant_split, new_split
 from app.agent.receipt import apply_claims, receipt_total
 from app.api.accounts import AccountStore, User
 from app.api.auth import current_user, get_accounts, require_user
@@ -37,6 +37,7 @@ from app.api.schemas import (
     PHOTO_TYPES,
     ApprovalIn,
     ClaimIn,
+    InstantSplitIn,
     PayerIn,
     PaymentMarkIn,
     ReceiptIn,
@@ -174,11 +175,28 @@ def create_split(
     receipt_ids = [save_photo(context.photos, photo) for photo in photos]
 
     split_id = secrets.token_urlsafe(9)  # 12 characters, unguessable: the link is the access
-    if context.user:  # saved first, so the split is theirs even if reading the bill fails
-        context.accounts.add_split(split_id, context.user.id)
-        friends = [person for person in people if person.lower() != context.user.name.lower()]
-        context.accounts.remember_friends(context.user.id, friends)
+    save_for_user(context, split_id, people)  # first, so the split is theirs even if reading fails
     run(context.graph, split_id, new_split(people, note.strip(), receipt_ids, name, group))
+    return describe(context, split_id)
+
+
+@router.post("/instant", status_code=201)
+def create_instant_split(
+    body: InstantSplitIn, context: Context = Depends(get_context), _: None = Depends(limit_new_splits)
+) -> dict:
+    """Split one amount without a photo, e.g. a cab. It's done straight away, and has the same
+    link, payments and history as a scanned bill."""
+    name = clean_split_name(body.name)
+    people = clean_people(body.people)
+    outsiders = [person for person in dict.fromkeys([body.paid_by, *body.shares]) if person not in people]
+    if outsiders:
+        raise reject(f"Not in this split: {', '.join(outsiders)}.")
+
+    split_id = secrets.token_urlsafe(9)
+    save_for_user(context, split_id, people)
+    state = instant_split(name, people, body.amount_paise, body.paid_by, body.shares)
+    # Saved as if the agent's last step had just been approved, so it opens as a finished split.
+    context.graph.update_state(config_for(split_id), state, as_node="approve_split")
     return describe(context, split_id)
 
 
@@ -275,6 +293,15 @@ def run(graph, split_id: str, graph_input) -> None:
         raise HTTPException(
             status_code=502, detail="Something went wrong while working on the bill. Please retry."
         ) from None
+
+
+def save_for_user(context: Context, split_id: str, people: list[str]) -> None:
+    """When signed in: the split goes in their history, and the others become their friends."""
+    if not context.user:
+        return
+    context.accounts.add_split(split_id, context.user.id)
+    friends = [person for person in people if person.lower() != context.user.name.lower()]
+    context.accounts.remember_friends(context.user.id, friends)
 
 
 def check_group_split(groups: GroupStore, group_id: str, people: list[str], added_by: str) -> dict:

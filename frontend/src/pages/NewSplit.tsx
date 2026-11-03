@@ -1,6 +1,6 @@
-// Start a split: what it's for, who was there, an optional note, and photos of the bill.
-// Signed in, you're added for you, recent friends are a tap away, and your groups and past
-// splits are below. Opened as /?group=<id>, it scans a bill into that group instead.
+// Scan a bill, at /scan: what it's for, who was there, an optional note, and photos of the bill.
+// Signed in, you're added for you and recent friends are a tap away. Opened as
+// /scan?group=<id>, it scans a bill into that group instead.
 
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -12,7 +12,6 @@ import { MemberToggles, PeoplePicker } from '../people'
 import { ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
 import { useMe } from '../useMe'
-import { Account } from './Account'
 
 export function NewSplit() {
   const navigate = useNavigate()
@@ -22,7 +21,7 @@ export function NewSplit() {
   const [photos, setPhotos] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [me, setMe] = useMe()
+  const [me] = useMe()
 
   // Scanning into a group: its members are the people, and the bill is added to its tab when done.
   const [params] = useSearchParams()
@@ -100,7 +99,7 @@ export function NewSplit() {
   return (
     <form onSubmit={start}>
       <Screen
-        title={group ? `Scan a bill into ${group.name}` : 'Split a bill'}
+        title={group ? `Scan a bill into ${group.name}` : 'Scan a bill'}
         action={
           <PrimaryButton type="submit" disabled={!ready}>
             {missing ?? 'Read the bill'}
@@ -160,18 +159,6 @@ export function NewSplit() {
         </label>
 
         {error && <ErrorText>{error}</ErrorText>}
-
-        {!group && <Account me={me} setMe={setMe} />}
-
-        <p className="mt-10 text-center text-sm text-muted">
-          <Link to="/privacy" className="underline">
-            Privacy
-          </Link>
-          {' · '}
-          <Link to="/terms" className="underline">
-            Terms
-          </Link>
-        </p>
       </Screen>
     </form>
   )

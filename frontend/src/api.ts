@@ -145,6 +145,16 @@ export function createSplit(
   return request('/api/splits', { method: 'POST', body: form })
 }
 
+/** One amount, no photo: `shares` is how many shares each person sharing it takes (1 each: equal). */
+export type InstantSplit = {
+  name: string
+  amount_paise: number
+  people: string[]
+  paid_by: string
+  shares: Record<string, number>
+}
+export const createInstantSplit = (split: InstantSplit) => request('/api/splits/instant', json(split))
+
 export const getSplit = (id: string) => request(`/api/splits/${id}`)
 export const answerSplit = (id: string, answer: unknown) =>
   request(`/api/splits/${id}/answer`, json(answer))

@@ -1,4 +1,5 @@
-// The bottom of the home screen: sign in (optional), or, once signed in, your past splits.
+// The account parts of the home screen: signing in (optional), who's signed in, and their
+// splits and groups.
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -7,30 +8,22 @@ import type { GroupSummary, Me, SplitSummary } from '../api'
 import { GoogleButton } from '../GoogleButton'
 import { formatRupees } from '../money'
 import { balanceWords, KIND_NAMES } from '../groups'
-import { ErrorText, KindIcon } from '../ui'
+import { Avatar, ErrorText, KindIcon } from '../ui'
 
-export function Account({ me, setMe }: { me: Me; setMe: (me: Me) => void }) {
-  if (!me.user) {
-    return (
-      <SignInBox
-        title="Keep your splits and friends"
-        why="Optional. Sign in to see past splits, start groups for trips and flatmates, and add friends with a tap."
-        setMe={setMe}
-      />
-    )
-  }
-
+/** Shows who's signed in, so it's clear the splits below are being saved, and a way out. */
+export function SignedInBar({ me, setMe }: { me: Me; setMe: (me: Me) => void }) {
+  if (!me.user) return null
   return (
-    <section className="mt-10">
-      <MyGroups />
-      <History />
-      <p className="mt-4 text-sm text-muted">
-        Signed in as {me.user.email}.{' '}
-        <button type="button" onClick={() => signOut().then(setMe)} className="font-semibold underline">
-          Sign out
-        </button>
-      </p>
-    </section>
+    <div className="flex items-center gap-3 rounded-2xl bg-white/60 p-3">
+      <Avatar name={me.user.name} color="var(--color-brand)" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">Signed in as {me.user.name}</span>
+        <span className="block truncate text-xs text-muted">{me.user.email}</span>
+      </span>
+      <button type="button" onClick={() => signOut().then(setMe)} className="text-sm font-semibold underline">
+        Sign out
+      </button>
+    </div>
   )
 }
 
@@ -66,7 +59,7 @@ export function SignInBox(props: { title: string; why: string; setMe: (me: Me) =
 }
 
 /** The signed-in user's groups, with where they stand in each, and a way to start one. */
-function MyGroups() {
+export function MyGroups() {
   const [groups, setGroups] = useState<GroupSummary[] | null>(null)
   useEffect(() => {
     getMyGroups()
@@ -112,7 +105,7 @@ function MyGroups() {
   )
 }
 
-function History() {
+export function History() {
   const [splits, setSplits] = useState<SplitSummary[] | null>(null)
   useEffect(() => {
     getMySplits()
@@ -120,12 +113,14 @@ function History() {
       .catch(() => setSplits([]))
   }, [])
 
-  if (!splits?.length) return null
   return (
-    <>
+    <div className="mb-8">
       <h2 className="mb-3 font-display text-xl font-semibold">Your splits</h2>
+      {splits?.length === 0 && (
+        <p className="rounded-2xl bg-white/60 p-4 text-sm text-muted">Bills you split show here, with who has paid.</p>
+      )}
       <ul className="space-y-2">
-        {splits.map((split) => (
+        {splits?.map((split) => (
           <li key={split.id}>
             <Link to={`/split/${split.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-4">
               <span className="min-w-0 flex-1">
@@ -139,7 +134,7 @@ function History() {
           </li>
         ))}
       </ul>
-    </>
+    </div>
   )
 }
 

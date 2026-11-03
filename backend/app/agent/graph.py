@@ -33,7 +33,7 @@ from app.agent.receipt import (
     totals_match,
 )
 from app.money.settle import settle
-from app.money.split import Bill, Item, balances, compute_breakdown
+from app.money.split import FULL, Bill, Item, balances, compute_breakdown
 from app.observability import AgentLogHandler
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
@@ -111,6 +111,30 @@ def new_split(
         "approval_error": None,
         "last_changes": [],
     }
+
+
+def instant_split(
+    name: str, people: list[str], amount_paise: int, paid_by: str, shares: dict[str, int]
+) -> SplitState:
+    """A split typed in rather than scanned: one amount (no photo, no AI), shared by `shares`
+    (person -> how many shares; 1 each splits it equally).
+
+    It is built as a finished, approved split, with one line item, so it opens, settles and
+    tracks payments exactly like a scanned bill. The money is worked out by the same nodes.
+    """
+    item: LineItem = {"name": name, "amount_paise": amount_paise, "category": "food", "quantity": 1}
+    receipt: Receipt = {
+        "items": [item], "tax_paise": 0, "service_charge_paise": 0, "printed_total_paise": amount_paise
+    }
+    # Doubled so one share is a FULL weight: the same proportions, never labelled a "half share".
+    assignment: Assignment = {"weights": {person: count * FULL for person, count in shares.items()}, "by_count": False}
+
+    state = new_split(people, "", [], name)
+    state["finished"] = [{"receipt": receipt, "assignments": [assignment], "paid": {paid_by: amount_paise}}]
+    state.update(compute_shares_node(state))
+    state.update(settle_node(state))
+    state["approved"] = True
+    return state
 
 
 # --- Nodes: each takes the state and returns only the fields it changes ---

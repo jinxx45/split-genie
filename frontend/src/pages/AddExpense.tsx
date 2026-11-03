@@ -6,10 +6,9 @@ import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ApiError, addQuickExpense, addRecurring, getGroup } from '../api'
 import type { Group } from '../api'
-import { personColor } from '../colors'
 import { rememberedMember } from '../groups'
-import { formatRupees, parseRupees } from '../money'
-import { MemberToggles } from '../people'
+import { parseRupees } from '../money'
+import { MemberToggles, PayerPicker, ShareSteppers } from '../people'
 import { ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
 
@@ -103,7 +102,7 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
       >
         {!monthly && (
           <Link
-            to={`/?group=${group.id}`}
+            to={`/scan?group=${group.id}`}
             className="mb-6 flex items-center gap-4 rounded-2xl border-2 border-dashed border-steel-dark bg-white/60 p-4"
           >
             <span aria-hidden className="text-3xl">🧾</span>
@@ -178,25 +177,7 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
         )}
 
         <p className="mt-6 mb-2 font-display text-lg font-semibold">Who paid?</p>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Who paid">
-          {group.members.map((member) => {
-            const on = paidBy === member
-            const color = personColor(group.members, member)
-            return (
-              <button
-                key={member}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => setPaidBy(member)}
-                className="rounded-full border-2 px-3 py-1.5 text-sm font-semibold"
-                style={{ borderColor: on ? color : 'var(--color-steel-dark)', background: on ? color : '#fff', color: on ? '#fff' : 'var(--color-muted)' }}
-              >
-                {member === you ? `${member} (you)` : member}
-              </button>
-            )
-          })}
-        </div>
+        <PayerPicker people={group.members} paidBy={paidBy} onChange={setPaidBy} you={you} />
 
         <div className="mt-6 mb-2 flex items-baseline justify-between">
           <p className="font-display text-lg font-semibold">Split between</p>
@@ -219,55 +200,5 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
         {error && <ErrorText>{error}</ErrorText>}
       </Screen>
     </form>
-  )
-}
-
-/** Uneven shares: e.g. a bigger room pays 2 shares. Shows what each share comes to. */
-function ShareSteppers(props: {
-  people: string[]
-  members: string[]
-  weights: Record<string, number>
-  onChange: (person: string, weight: number) => void
-  paise: number | null
-}) {
-  const total = Object.values(props.weights).reduce((sum, weight) => sum + weight, 0)
-  return (
-    <ul className="mt-3 divide-y divide-steel rounded-2xl bg-white px-4">
-      {props.people.map((person) => {
-        const weight = props.weights[person]
-        return (
-          <li key={person} className="flex items-center gap-3 py-2">
-            <span className="size-2.5 rounded-full" style={{ background: personColor(props.members, person) }} aria-hidden />
-            <span className="flex-1">
-              {person}
-              {props.paise ? (
-                <span className="block text-sm text-muted">about {formatRupees(Math.round((props.paise * weight) / total))}</span>
-              ) : null}
-            </span>
-            <button
-              type="button"
-              aria-label={`One share less for ${person}`}
-              disabled={weight <= 1}
-              onClick={() => props.onChange(person, weight - 1)}
-              className="flex size-9 items-center justify-center rounded-full bg-steel font-display text-xl font-semibold disabled:opacity-35"
-            >
-              −
-            </button>
-            <span className="amount w-18 text-center whitespace-nowrap">
-              {weight} share{weight > 1 ? 's' : ''}
-            </span>
-            <button
-              type="button"
-              aria-label={`One share more for ${person}`}
-              disabled={weight >= 9}
-              onClick={() => props.onChange(person, weight + 1)}
-              className="flex size-9 items-center justify-center rounded-full bg-steel font-display text-xl font-semibold disabled:opacity-35"
-            >
-              +
-            </button>
-          </li>
-        )
-      })}
-    </ul>
   )
 }

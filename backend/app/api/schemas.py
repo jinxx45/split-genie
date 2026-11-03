@@ -32,6 +32,8 @@ PHOTO_TYPES = {  # the image types Gemini can read (with their usual file extens
 }
 MAX_AMOUNT_PAISE = 10_000_000  # ₹1,00,000 per line, far above any real bill line
 MAX_QUANTITY = 999
+MAX_INSTANT_PAISE = 100_000_000  # ₹10,00,000 for one instant split: room for rent or flights
+MAX_SHARES = 9  # per person in an instant split, e.g. a bigger room takes 2 shares
 UPI_ID_PATTERN = r"^[A-Za-z0-9._-]{2,256}@[A-Za-z]{2,64}$"  # name@bank, e.g. priya@okaxis
 
 
@@ -85,6 +87,17 @@ class PaymentMarkIn(BaseModel):
     receiver: str
     paid: StrictBool
     by: str  # who is marking it: the payer ("I've paid") or the person paid ("Got it")
+
+
+class InstantSplitIn(BaseModel):
+    """One amount split without a photo, e.g. a cab: who's in, who paid, and how many shares each
+    person in `shares` takes (1 each splits it equally)."""
+
+    name: str
+    amount_paise: int = Field(ge=1, le=MAX_INSTANT_PAISE)
+    people: list[str]
+    paid_by: str
+    shares: dict[str, Annotated[int, Field(ge=1, le=MAX_SHARES)]] = Field(min_length=1)
 
 
 class ClaimIn(BaseModel):
