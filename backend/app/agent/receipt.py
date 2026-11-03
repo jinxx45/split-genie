@@ -20,7 +20,6 @@ class LineItem(TypedDict):
 
 
 class Receipt(TypedDict):
-    place: str  # the restaurant or shop name printed on the bill; "" if there isn't one
     items: list[LineItem]
     tax_paise: int  # all taxes plus adjustments such as round-off or discounts
     service_charge_paise: int

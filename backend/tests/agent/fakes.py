@@ -12,7 +12,6 @@ from app.agent.receipt import (
 from app.money.split import FULL
 
 DINNER: Receipt = {
-    "place": "Hotel Saravana",
     "items": [
         {"name": "Chicken Biryani", "amount_paise": 60000, "category": "food", "quantity": 1},
         {"name": "Kingfisher", "amount_paise": 40000, "category": "alcohol", "quantity": 2},
@@ -24,7 +23,6 @@ DINNER: Receipt = {
 }
 
 LUNCH: Receipt = {
-    "place": "Murugan Idli Shop",
     "items": [
         {"name": "Meals", "amount_paise": 36000, "category": "food", "quantity": 1},
         {"name": "Filter Coffee", "amount_paise": 9000, "category": "drink", "quantity": 3},

@@ -46,7 +46,7 @@ def test_a_split_from_photo_to_payments(client):
     assert split["question"] is None
     assert sum(split["result"]["shares"].values()) == 123200
     assert {p["sender"] for p in split["result"]["payments"]} == {"Arun", "Ravi"}
-    assert split["result"]["title"] == "Hotel Saravana"
+    assert split["name"] == "Saturday dinner"
     assert split["result"]["total_paise"] == 123200
     assert split["result"]["paid"] == {"Priya": 123200}
 
@@ -213,11 +213,10 @@ def test_summary_covers_every_receipt():
     finished = [
         {"receipt": DINNER, "paid": {"Priya": 123200}},
         {"receipt": LUNCH, "paid": {"Priya": 20000, "Arun": 27250}},
-        {"receipt": {**LUNCH, "place": ""}, "paid": {"Arun": 47250}},  # no name printed
+        {"receipt": LUNCH, "paid": {"Arun": 47250}},
     ]
 
     assert bill_summary(finished) == {
-        "title": "Hotel Saravana + Murugan Idli Shop",
         "total_paise": 123200 + 47250 + 47250,
         "paid": {"Priya": 143200, "Arun": 74500},
     }
@@ -298,3 +297,15 @@ def test_one_visitor_can_only_start_so_many_splits_an_hour(client):
 
     assert response.status_code == 429
     assert "try again later" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(("name", "message"), [("   ", "Give the split a name"), ("x" * 61, "under 60")])
+def test_a_split_needs_a_name(client, name, message):
+    response = create(client, name=name)
+
+    assert response.status_code == 422
+    assert message in response.json()["detail"]
+
+
+def test_the_name_is_tidied(client):
+    assert create(client, name="  Goa   day 2  ").json()["name"] == "Goa day 2"

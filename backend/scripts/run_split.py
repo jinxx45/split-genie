@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("photos", type=Path, nargs="+")
     parser.add_argument("--people", required=True, help="Comma-separated names, e.g. Arun,Priya,Ravi")
     parser.add_argument("--note", default="", help="e.g. \"Ravi doesn't drink\"")
+    parser.add_argument("--name", default="Terminal split", help="What the split is for")
     args = parser.parse_args()
 
     if not settings.gemini_api_key:
@@ -43,7 +44,7 @@ def main() -> None:
         InMemorySaver(), llm.read_receipt, llm.suggest_assignments, llm.correct_assignments
     )
     config = {"configurable": {"thread_id": f"terminal-{uuid.uuid4().hex[:8]}"}}
-    graph.invoke(new_split(people, args.note, receipt_ids), config)
+    graph.invoke(new_split(people, args.note, receipt_ids, args.name), config)
 
     while True:
         state = graph.get_state(config)

@@ -10,7 +10,6 @@ export type Category = 'food' | 'drink' | 'alcohol' | 'dessert'
 export type Item = { name: string; amount_paise: number; category: Category; quantity: number }
 
 export type Receipt = {
-  place: string // the restaurant or shop name; '' if the bill doesn't show one
   items: Item[]
   tax_paise: number
   service_charge_paise: number
@@ -49,7 +48,6 @@ export type Question =
       people: string[]
       items: ReviewItem[]
       light_eaters: string[]
-      place: string
       claims: Record<string, Record<string, number>> // friend -> {item index: weight}, from their links
       claimed: Assignment[] // the suggestions updated with friends' claims, one per item
     }
@@ -65,12 +63,12 @@ export type Question =
 
 export type Split = {
   id: string
+  name: string // what the split is for, e.g. 'Saturday lunch'
   status: 'waiting' | 'failed' | 'done'
   people: string[]
   can_answer: boolean // false: started by someone else while signed in; only they can answer
   question: Question | null
   result: {
-    title: string // the place names of every receipt, e.g. 'Hotel Saravana'; '' if none
     total_paise: number
     paid: Record<string, number>
     shares: Record<string, number>
@@ -82,10 +80,10 @@ export type Split = {
 /** One of the signed-in user's splits, for the history list. */
 export type SplitSummary = {
   id: string
-  created_at: string // UTC, "2026-11-02 09:14:05"
+  created_at: string // UTC, "2026-11-02T09:14:05.123456Z"
   status: Split['status']
   people: string[]
-  title: string
+  name: string
   total_paise: number | null // null until the split is done
   payments: number
   paid: number
@@ -127,8 +125,9 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 })
 
-export function createSplit(people: string[], note: string, photos: File[]): Promise<Split> {
+export function createSplit(name: string, people: string[], note: string, photos: File[]): Promise<Split> {
   const form = new FormData()
+  form.append('name', name)
   people.forEach((person) => form.append('people', person))
   form.append('note', note)
   photos.forEach((photo) => form.append('photos', photo))
@@ -145,6 +144,7 @@ export const markPayment = (id: string, mark: PaymentMark) => request(`/api/spli
 
 // --- Signing in, and the signed-in user's details ---
 
+export const getSite = () => request<{ contact_email: string }>('/api/site')
 export const getAuthConfig = () => request<{ google_client_id: string }>('/api/auth/config')
 export const getMe = () => request<Me>('/api/me')
 export const signInWithGoogle = (credential: string) => request<Me>('/api/auth/google', json({ credential }))

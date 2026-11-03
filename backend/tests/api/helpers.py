@@ -16,10 +16,10 @@ def fake_google(credential: str) -> dict:
     }
 
 
-def create(client, people=PEOPLE, note="Ravi doesn't drink", photos=(JPEG,)):
+def create(client, people=PEOPLE, note="Ravi doesn't drink", photos=(JPEG,), name="Saturday dinner"):
     return client.post(
         "/api/splits",
-        data={"people": list(people), "note": note},
+        data={"name": name, "people": list(people), "note": note},
         files=[("photos", photo) for photo in photos],
     )
 

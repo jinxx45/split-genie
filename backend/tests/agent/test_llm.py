@@ -23,7 +23,6 @@ PEOPLE = ["Arun", "Priya", "Ravi"]
 
 def test_reading_is_converted_to_paise_and_charges_are_grouped():
     reading = ReceiptReading(
-        place=" Hotel Saravana ",
         items=[
             ReadLine(name="Chicken Biryani", amount="600.00", quantity=1, category="food"),
             ReadLine(name="Kingfisher x2", amount="400.00", quantity=2, category="alcohol"),  # kept "x2"
@@ -47,13 +46,11 @@ def test_reading_is_converted_to_paise_and_charges_are_grouped():
     }
     assert receipt["tax_paise"] == 2500 + 2500 - 40
     assert receipt["service_charge_paise"] == 5000
-    assert receipt["place"] == "Hotel Saravana"
     assert totals_match(receipt)
 
 
 def test_unreadable_amount_counts_as_zero_so_totals_do_not_match():
     reading = ReceiptReading(
-        place="",
         items=[ReadLine(name="Dosa", amount="??", quantity=0, category="food")],
         charges=[],
         total="120.00",
@@ -153,7 +150,7 @@ class FakeGemini:
 def test_read_receipt_sends_the_photo_and_any_feedback(tmp_path, monkeypatch):
     (tmp_path / "r1.png").write_bytes(b"fake image bytes")
     monkeypatch.setattr(llm.settings, "uploads_dir", tmp_path)
-    fake = FakeGemini(ReceiptReading(place="", items=[], charges=[], total="0"))
+    fake = FakeGemini(ReceiptReading(items=[], charges=[], total="0"))
     monkeypatch.setattr(llm, "gemini", lambda: fake)
 
     llm.read_receipt("r1.png", feedback="Your last reading added up to ₹1.00")

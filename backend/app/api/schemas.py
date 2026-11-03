@@ -19,6 +19,7 @@ from app.agent.receipt import (
 
 MAX_PEOPLE = 20
 MAX_NAME_LENGTH = 40
+MAX_SPLIT_NAME_LENGTH = 60
 MAX_NOTE_LENGTH = 500
 MAX_PHOTOS = 5
 MAX_PHOTO_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -44,7 +45,6 @@ class ItemIn(BaseModel):
 class ReceiptIn(BaseModel):
     """Answer to "check the items": the receipt, with any fixes."""
 
-    place: str = Field(default="", max_length=100)
     items: list[ItemIn] = Field(min_length=1, max_length=200)
     tax_paise: int = Field(ge=-MAX_AMOUNT_PAISE, le=MAX_AMOUNT_PAISE)  # negative: a discount
     service_charge_paise: int = Field(ge=0, le=MAX_AMOUNT_PAISE)
@@ -98,6 +98,15 @@ class ClaimIn(BaseModel):
 def reject(message: str) -> HTTPException:
     """422 Unprocessable Content: the request was understood but its data can't be used."""
     return HTTPException(status_code=422, detail=message)
+
+
+def clean_split_name(name: str) -> str:
+    name = " ".join(name.split())  # trim, and collapse runs of spaces
+    if not name:
+        raise reject("Give the split a name, for example \"Saturday lunch\".")
+    if len(name) > MAX_SPLIT_NAME_LENGTH:
+        raise reject(f"Keep the split's name under {MAX_SPLIT_NAME_LENGTH} characters.")
+    return name
 
 
 def clean_people(names: list[str]) -> list[str]:

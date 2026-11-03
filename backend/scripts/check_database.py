@@ -24,7 +24,6 @@ from app.api.photos import PhotoStore
 from app.config import settings
 
 TEST_RECEIPT = {
-    "place": "Check",
     "items": [{"name": "Tea", "amount_paise": 2000, "category": "drink", "quantity": 1}],
     "tax_paise": 0,
     "service_charge_paise": 0,
@@ -132,7 +131,7 @@ def check_agent(database: Database, run_id: str) -> str:
 
     config = {"configurable": {"thread_id": run_id}}
     try:
-        build().invoke(new_split(["Arun", "Priya"], "", [run_id]), config)
+        build().invoke(new_split(["Arun", "Priya"], "", [run_id], "Check"), config)
         reopened = build()
         assert reopened.get_state(config).interrupts[0].value["step"] == "confirm_items"
         reopened.invoke(Command(resume=TEST_RECEIPT), config)

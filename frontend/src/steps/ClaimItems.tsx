@@ -8,6 +8,7 @@ import { formatRupees } from '../money'
 import { ErrorText, PrimaryButton, Screen, SecondaryButton } from '../ui'
 
 type Props = {
+  name: string // the split's name
   question: Extract<Question, { step: 'review_assignments' }>
   friend: string
   onClaim: (items: Record<number, number>) => void
@@ -15,7 +16,7 @@ type Props = {
   error: string | null
 }
 
-export function ClaimItems({ question, friend, onClaim, busy, error }: Props) {
+export function ClaimItems({ name, question, friend, onClaim, busy, error }: Props) {
   const previous = question.claims[friend]
   const [claimed, setClaimed] = useState<Record<number, number>>(previous ?? {})
   const [editing, setEditing] = useState(previous === undefined)
@@ -57,7 +58,7 @@ export function ClaimItems({ question, friend, onClaim, busy, error }: Props) {
       }
     >
       <p className="mb-5 text-muted">
-        Tap what you had{question.place ? ` at ${question.place}` : ''}. The person splitting the bill checks it before
+        Tap what you had for {name}. The person splitting the bill checks it before
         working out who pays.
       </p>
       <ul className="space-y-3">

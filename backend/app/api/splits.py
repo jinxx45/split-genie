@@ -43,6 +43,7 @@ from app.api.schemas import (
     check_payers,
     check_review,
     clean_people,
+    clean_split_name,
     reject,
 )
 from app.config import settings
@@ -138,7 +139,7 @@ def my_splits(user: User = Depends(require_user), context: Context = Depends(get
                 "created_at": created_at,
                 "status": split["status"],
                 "people": split["people"],
-                "title": result["title"] if result else "",
+                "name": split["name"],
                 "total_paise": result["total_paise"] if result else None,
                 "payments": len(result["payments"]) if result else 0,
                 "paid": sum(1 for payment in result["payments"] if payment["marked_paid_by"]) if result else 0,
@@ -149,6 +150,7 @@ def my_splits(user: User = Depends(require_user), context: Context = Depends(get
 
 @router.post("", status_code=201)
 def create_split(
+    name: str = Form(...),
     people: list[str] = Form(...),
     note: str = Form("", max_length=MAX_NOTE_LENGTH),
     photos: list[UploadFile] = File(...),
@@ -156,6 +158,7 @@ def create_split(
     _: None = Depends(limit_new_splits),
 ) -> dict:
     """Start a split from receipt photos. Reads the first receipt, then returns its first question."""
+    name = clean_split_name(name)
     people = clean_people(people)
     if not 1 <= len(photos) <= MAX_PHOTOS:
         raise reject(f"Add 1 to {MAX_PHOTOS} receipt photos.")
@@ -166,7 +169,7 @@ def create_split(
         context.accounts.add_split(split_id, context.user.id)
         friends = [person for person in people if person.lower() != context.user.name.lower()]
         context.accounts.remember_friends(context.user.id, friends)
-    run(context.graph, split_id, new_split(people, note.strip(), receipt_ids))
+    run(context.graph, split_id, new_split(people, note.strip(), receipt_ids, name))
     return describe(context, split_id)
 
 
@@ -288,8 +291,7 @@ def describe(context: Context, split_id: str) -> dict:
             # splitter taps "Use their answers").
             claims = context.claims.claims(split_id, values["current"])
             claimed = apply_claims(values["receipt"]["items"], values["assignments"], claims)
-            place = values["receipt"]["place"]
-            question = {**question, "place": place, "claims": claims, "claimed": claimed}
+            question = {**question, "claims": claims, "claimed": claimed}
     elif state.next:
         status, question = "failed", None
     else:
@@ -309,6 +311,7 @@ def describe(context: Context, split_id: str) -> dict:
         }
     return {
         "id": split_id,
+        "name": values.get("name", ""),  # .get: splits saved before names existed still open
         "status": status,
         "people": values["people"],
         "can_answer": can_answer(context, split_id),
@@ -318,15 +321,12 @@ def describe(context: Context, split_id: str) -> dict:
 
 
 def bill_summary(finished: list[dict]) -> dict:
-    """What the finished split was for, its total, and who paid, across all its receipts."""
-    # .get: splits saved before receipts had a place still open.
-    places = [done["receipt"].get("place", "") for done in finished]
+    """The finished split's total, and who paid, across all its receipts."""
     paid: dict[str, int] = {}
     for done in finished:
         for person, amount in done["paid"].items():
             paid[person] = paid.get(person, 0) + amount
     return {
-        "title": " + ".join(dict.fromkeys(place for place in places if place)),  # unique, in order
         "total_paise": sum(receipt_total(done["receipt"]) for done in finished),
         "paid": paid,
     }

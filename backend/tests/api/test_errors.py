@@ -32,4 +32,4 @@ def test_validation_errors_are_one_readable_sentence(client):
     response = client.post("/api/splits", data={"note": "x"}, files=[])
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "people: Field required"}
+    assert response.json() == {"detail": "name: Field required"}

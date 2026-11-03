@@ -49,7 +49,6 @@ class ReadCharge(BaseModel):
 
 
 class ReceiptReading(BaseModel):
-    place: str = Field(description="The restaurant or shop name printed on the bill; empty if none")
     items: list[ReadLine]
     charges: list[ReadCharge]
     total: str = Field(description="The grand total printed on the bill")
@@ -129,7 +128,6 @@ def reading_to_receipt(reading: ReceiptReading) -> Receipt:
             tax += amount_or_zero(charge.amount)
 
     return {
-        "place": reading.place.strip(),
         "items": items,
         "tax_paise": tax,
         "service_charge_paise": service_charge,

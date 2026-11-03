@@ -60,6 +60,7 @@ class FinishedReceipt(TypedDict):
 
 
 class SplitState(TypedDict):
+    name: str  # what the split is for, e.g. "Saturday lunch"; shown everywhere the split is
     people: list[str]
     note: str
     receipt_ids: list[str]
@@ -81,9 +82,10 @@ class SplitState(TypedDict):
     last_changes: list[dict]  # what the last correction changed, shown on the approval screen
 
 
-def new_split(people: list[str], note: str, receipt_ids: list[str]) -> SplitState:
-    """The starting state for a split."""
+def new_split(people: list[str], note: str, receipt_ids: list[str], name: str) -> SplitState:
+    """The starting state for a split. `name` is what it's for, e.g. "Saturday lunch"."""
     return {
+        "name": name,
         "people": people,
         "note": note,
         "receipt_ids": receipt_ids,

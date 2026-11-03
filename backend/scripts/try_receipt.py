@@ -33,7 +33,6 @@ def main() -> None:
 
     receipt = llm.read_receipt(photo.name, feedback=None)
 
-    print(f"\nPlace: {receipt['place'] or '(not printed)'}")
     print("\nItems")
     for index, item in enumerate(receipt["items"]):
         print(f"  {index}. {item['name']:<30} {format_rupees(item['amount_paise']):>12}  {item['category']}")

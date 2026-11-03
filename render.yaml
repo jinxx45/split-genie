@@ -19,3 +19,5 @@ services:
         sync: false
       - key: LANGSMITH_API_KEY  # optional: leave empty to turn tracing off
         sync: false
+      - key: CONTACT_EMAIL  # shown on the privacy page
+        sync: false

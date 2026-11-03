@@ -22,7 +22,7 @@ def run_until_first_pause(read_receipt=fakes.read_receipt):
         InMemorySaver(), read_receipt, fakes.suggest_assignments, fakes.correct_assignments
     )
     graph.invoke(
-        new_split(PEOPLE, NOTE, ["lunch"]), {"configurable": {"thread_id": "split-42"}}
+        new_split(PEOPLE, NOTE, ["lunch"], "Lunch"), {"configurable": {"thread_id": "split-42"}}
     )
 
 

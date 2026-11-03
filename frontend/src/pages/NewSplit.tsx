@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ApiError, createSplit } from '../api'
 import { Avatar, ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
@@ -13,8 +13,9 @@ import { Account } from './Account'
 
 export function NewSplit() {
   const navigate = useNavigate()
+  const [splitName, setSplitName] = useState('') // what the split is for
   const [people, setPeople] = useState<string[]>([])
-  const [name, setName] = useState('')
+  const [name, setName] = useState('') // the person's name being typed
   const [note, setNote] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
@@ -51,7 +52,7 @@ export function NewSplit() {
     setBusy(true)
     setError(null)
     try {
-      const split = await createSplit(people, note, photos)
+      const split = await createSplit(splitName.trim(), people, note, photos)
       navigate(`/split/${split.id}`)
     } catch (problem) {
       setError(problem instanceof ApiError ? problem.message : 'Couldn’t reach Split Rupya. Check your connection.')
@@ -61,20 +62,39 @@ export function NewSplit() {
 
   if (busy) return <Reading />
 
-  const ready = people.length >= 2 && photos.length > 0
-  const missing =
-    people.length < 2 ? 'Add at least two people' : photos.length === 0 ? 'Add a photo of the bill' : null
+  const missing = !splitName.trim()
+    ? 'Name the split first'
+    : people.length < 2
+      ? 'Add at least two people'
+      : photos.length === 0
+        ? 'Add a photo of the bill'
+        : null
+  const ready = missing === null
 
   return (
     <form onSubmit={start}>
       <Screen
-        title="Who’s splitting the bill?"
+        title="Split a bill"
         action={
           <PrimaryButton type="submit" disabled={!ready}>
             {missing ?? 'Read the bill'}
           </PrimaryButton>
         }
       >
+        <label className="block">
+          <span className="font-display text-lg font-semibold">What’s it for?</span>
+          <input
+            value={splitName}
+            onChange={(event) => setSplitName(event.target.value)}
+            placeholder="Saturday lunch"
+            maxLength={60}
+            required
+            enterKeyHint="next"
+            className="mt-2 w-full rounded-2xl bg-white px-4 py-3"
+          />
+        </label>
+
+        <p className="mt-6 mb-2 font-display text-lg font-semibold">Who was there?</p>
         <div className="flex flex-wrap gap-2">
           {people.map((person) => (
             <button
@@ -166,6 +186,16 @@ export function NewSplit() {
         {error && <ErrorText>{error}</ErrorText>}
 
         <Account me={me} setMe={setMe} />
+
+        <p className="mt-10 text-center text-sm text-muted">
+          <Link to="/privacy" className="underline">
+            Privacy
+          </Link>
+          {' · '}
+          <Link to="/terms" className="underline">
+            Terms
+          </Link>
+        </p>
       </Screen>
     </form>
   )

@@ -14,7 +14,7 @@ import { useMe } from '../useMe'
 import { BreakdownList, BreakdownPaper, Payments } from './Summary'
 
 type Result = NonNullable<Split['result']>
-type Base = { result: Result; people: string[] }
+type Base = { name: string; result: Result; people: string[] }  // name: the split's name
 type Props = Base & { onMark: (mark: PaymentMark) => void; busy: boolean; error: string | null }
 
 // A UPI ID looks like name@bank.
@@ -29,7 +29,7 @@ export function Done(props: Props) {
   return <SplitterView {...props} />
 }
 
-function SplitterView({ result, people, onMark, busy, error }: Props) {
+function SplitterView({ name, result, people, onMark, busy, error }: Props) {
   // Only people still waiting on money need their UPI ID in the requests.
   const waiting = result.payments.filter((payment) => !payment.marked_paid_by)
   const receivers = [...new Set(waiting.map((payment) => payment.receiver))]
@@ -61,7 +61,7 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
       action={
         waiting.length > 0 && (
           <a
-            href={`https://wa.me/?text=${encodeURIComponent(summaryMessage(result, people, upiIds))}`}
+            href={`https://wa.me/?text=${encodeURIComponent(summaryMessage(name, result, people, upiIds))}`}
             target="_blank"
             rel="noreferrer"
             className="block w-full rounded-2xl bg-brand px-5 py-4 text-center font-display text-lg font-semibold text-white active:scale-[0.98]"
@@ -71,7 +71,7 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
         )
       }
     >
-      <BillSummary result={result} people={people} />
+      <BillSummary name={name} result={result} people={people} />
 
       {result.payments.length > 0 && (
         <>
@@ -125,7 +125,7 @@ function SplitterView({ result, people, onMark, busy, error }: Props) {
 }
 
 function FriendView(props: Props & { friend: string; upiIds: Record<string, string> }) {
-  const { friend, result, people, upiIds, onMark, busy, error } = props
+  const { friend, name, result, people, upiIds, onMark, busy, error } = props
   const mine = result.payments.filter((payment) => payment.sender === friend || payment.receiver === friend)
   const payable = mine.filter(
     (payment) => payment.sender === friend && !payment.marked_paid_by && upiIds[payment.receiver],
@@ -183,7 +183,7 @@ function FriendView(props: Props & { friend: string; upiIds: Record<string, stri
       )}
 
       <h2 className="mt-8 mb-3 font-display text-xl font-semibold">The whole bill</h2>
-      <BillSummary result={result} people={people} />
+      <BillSummary name={name} result={result} people={people} />
       <div className="mt-3">
         <BreakdownList breakdown={result.breakdown} people={people} />
       </div>
@@ -211,11 +211,11 @@ function markFor(payment: Payment, paid: boolean, by: string): PaymentMark {
 }
 
 /** The bill at a glance: where, how much, how many people, who paid. */
-function BillSummary({ result, people }: Base) {
+function BillSummary({ name, result, people }: Base) {
   return (
     <Paper>
       <div className="text-center">
-        <p className="font-display text-xl font-semibold">{result.title || 'The bill'}</p>
+        <p className="font-display text-xl font-semibold">{name || 'The bill'}</p>
         <p className="amount text-4xl font-bold">{formatRupees(result.total_paise)}</p>
         <p className="mt-1 text-muted">
           Split between {people.length} people, paid by {joinNames(Object.keys(result.paid))}
@@ -227,7 +227,7 @@ function BillSummary({ result, people }: Base) {
 
 /** One WhatsApp message for everyone: who pays whom, and one link. Each friend opens it, picks
  * their name, and sees their own share with a pay button. Sent to a group or to several chats. */
-function summaryMessage(result: Result, people: string[], upiIds: Record<string, string>): string {
+function summaryMessage(name: string, result: Result, people: string[], upiIds: Record<string, string>): string {
   const params = new URLSearchParams({ who: '' })
   // Every UPI ID typed in goes in the link as name:id, so friends get pay buttons.
   Object.entries(upiIds).forEach(([person, id]) => params.append('upi', `${person}:${id}`))
@@ -235,7 +235,7 @@ function summaryMessage(result: Result, people: string[], upiIds: Record<string,
   const waiting = result.payments.filter((payment) => !payment.marked_paid_by)
 
   return [
-    `*${result.title || 'The bill'}*: ${formatRupees(result.total_paise)}, split between ${people.length}`,
+    `*${name || 'The bill'}*: ${formatRupees(result.total_paise)}, split between ${people.length}`,
     '',
     ...waiting.map((payment) => `${payment.sender} pays ${payment.receiver} ${formatRupees(payment.amount_paise)}`),
     '',

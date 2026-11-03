@@ -77,6 +77,12 @@ async def readable_validation_error(request: Request, error: RequestValidationEr
     return JSONResponse(status_code=422, content={"detail": f"{where}: {first['msg']}" if where else first["msg"]})
 
 
+@app.get("/api/site")
+def site() -> dict[str, str]:
+    """Public details the app shows, such as the privacy page's contact."""
+    return {"contact_email": settings.contact_email}
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "split-genie"}

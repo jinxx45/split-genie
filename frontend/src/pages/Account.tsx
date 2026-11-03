@@ -69,7 +69,7 @@ function History() {
           <li key={split.id}>
             <Link to={`/split/${split.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-4">
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{split.title || split.people.join(', ')}</span>
+                <span className="block truncate font-semibold">{split.name || split.people.join(', ')}</span>
                 <span className="text-sm text-muted">
                   {shortDate(split.created_at)}, {status(split)}
                 </span>
@@ -90,7 +90,9 @@ function status(split: SplitSummary): string {
   return `${split.paid} of ${split.payments} paid`
 }
 
-/** "2026-11-02 09:14:05" (UTC from the server) -> "2 Nov" in the viewer's time zone. */
+/** "2026-11-02T09:14:05.123456Z" (UTC from the server) -> "2 Nov" in the viewer's time zone.
+ * Only the first 19 characters are read, so the older "2026-11-02 09:14:05" format works too. */
 function shortDate(utc: string): string {
-  return new Date(`${utc.replace(' ', 'T')}Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  const seconds = utc.slice(0, 19).replace(' ', 'T')
+  return new Date(`${seconds}Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }

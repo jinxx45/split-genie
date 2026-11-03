@@ -58,14 +58,6 @@ export function ConfirmItems({ question, answer, busy, error }: Props) {
     >
       <p className="mb-4 text-muted">Tap any line to fix or delete it.</p>
       <Paper>
-        <input
-          value={receipt.place}
-          onChange={(event) => setReceipt({ ...receipt, place: event.target.value })}
-          placeholder="Restaurant name"
-          aria-label="Restaurant name"
-          maxLength={100}
-          className="mb-2 w-full border-b border-dashed border-steel-dark pb-2 text-center font-display text-xl font-semibold"
-        />
         <ul>
           {receipt.items.map((item, index) =>
             editing === index ? (

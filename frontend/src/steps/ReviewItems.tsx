@@ -14,7 +14,7 @@ import { personColor } from '../colors'
 
 type Props = StepProps<Extract<Question, { step: 'review_assignments' }>>
 
-export function ReviewItems({ question, people, answer, busy, error }: Props) {
+export function ReviewItems({ question, name, people, answer, busy, error }: Props) {
   const [assignments, setAssignments] = useState<Assignment[]>(question.items.map((entry) => entry.suggested))
   const [lightEaters, setLightEaters] = useState<string[]>(question.light_eaters)
 
@@ -55,7 +55,7 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
         </PrimaryButton>
       }
     >
-      <AskFriends people={people} place={question.place} claims={question.claims} onUse={applyClaims} />
+      <AskFriends people={people} name={name} claims={question.claims} onUse={applyClaims} />
       <LightEaters people={people} lightEaters={lightEaters} onToggle={toggleLightEater} />
       <p className="mb-5 text-muted">Tap a name: once for a full share, again for half, again to remove.</p>
       <ul className="space-y-3">
@@ -78,15 +78,15 @@ export function ReviewItems({ question, people, answer, busy, error }: Props) {
  * they had. Then see who has answered, and use their answers. */
 function AskFriends(props: {
   people: string[]
-  place: string
+  name: string // the split's name
   claims: Record<string, Record<string, number>>
   onUse: () => void
 }) {
-  const { people, place, claims, onUse } = props
+  const { people, name, claims, onUse } = props
   const answered = people.filter((person) => claims[person] !== undefined)
 
   const link = `${window.location.origin}${window.location.pathname}?who`
-  const message = `Splitting the bill${place ? ` for ${place}` : ''}. Tap what you had:\n${link}`
+  const message = `Splitting the bill for ${name}. Tap what you had:\n${link}`
 
   return (
     <details open={answered.length > 0} className="group mb-3 rounded-2xl bg-white p-4">

@@ -23,7 +23,7 @@ def start(receipt_ids, note=NOTE, **graph_options):
     """Start a split and run it until its first pause."""
     graph = make_graph(**graph_options)
     config = {"configurable": {"thread_id": "test"}}
-    graph.invoke(new_split(PEOPLE, note, receipt_ids), config)
+    graph.invoke(new_split(PEOPLE, note, receipt_ids, "Dinner"), config)
     return graph, config
 
 
@@ -174,7 +174,7 @@ def test_split_resumes_from_a_new_graph_using_the_same_checkpointer():
     """Simulates closing the app and coming back later: same thread id, fresh graph."""
     checkpointer = InMemorySaver()
     config = {"configurable": {"thread_id": "goa-trip"}}
-    make_graph(checkpointer).invoke(new_split(PEOPLE, NOTE, ["lunch"]), config)
+    make_graph(checkpointer).invoke(new_split(PEOPLE, NOTE, ["lunch"], "Lunch"), config)
 
     later = make_graph(checkpointer)
 

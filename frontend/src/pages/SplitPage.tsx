@@ -19,6 +19,7 @@ import { Reading } from './Reading'
 
 export type StepProps<Q> = {
   question: Q
+  name: string // the split's name
   people: string[]
   answer: (body: unknown) => Promise<void>
   busy: boolean
@@ -98,12 +99,22 @@ export function SplitPage() {
 
   if (done) {
     const mark = (body: PaymentMark) => send(() => markPayment(id, body), false)
-    return <Done result={done} people={split.people} onMark={mark} busy={busy} error={error} />
+    return <Done name={split.name} result={done} people={split.people} onMark={mark} busy={busy} error={error} />
   }
 
   if (asking && isFriend) {
     const claim = (items: Record<number, number>) => send(() => claimItems(id, friend, items))
-    return <ClaimItems key={version} question={asking} friend={friend} onClaim={claim} busy={busy} error={error} />
+    return (
+      <ClaimItems
+        key={version}
+        name={split.name}
+        question={asking}
+        friend={friend}
+        onClaim={claim}
+        busy={busy}
+        error={error}
+      />
+    )
   }
 
   if (isFriend || !split.can_answer) {
@@ -130,7 +141,7 @@ export function SplitPage() {
     )
   }
 
-  const props = { people: split.people, answer, busy, error }
+  const props = { name: split.name, people: split.people, answer, busy, error }
   const question = split.question
   switch (question.step) {
     case 'confirm_items':
