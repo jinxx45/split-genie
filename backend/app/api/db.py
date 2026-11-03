@@ -69,7 +69,8 @@ class Connection:
 
 
 class Store:
-    """The base for a group of tables. SCHEMA: CREATE TABLE IF NOT EXISTS statements, run on start."""
+    """The base for a group of tables. SCHEMA: CREATE TABLE IF NOT EXISTS statements, run on start.
+    Statements are split at each semicolon, so comments in SCHEMA must not contain one."""
 
     SCHEMA = ""
 

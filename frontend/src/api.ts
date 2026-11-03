@@ -64,6 +64,7 @@ export type Question =
 export type Split = {
   id: string
   name: string // what the split is for, e.g. 'Saturday lunch'
+  group: { id: string; name: string; added_by: string } | null // set when the bill was scanned into a group
   status: 'waiting' | 'failed' | 'done'
   people: string[]
   can_answer: boolean // false: started by someone else while signed in; only they can answer
@@ -125,9 +126,19 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 })
 
-export function createSplit(name: string, people: string[], note: string, photos: File[]): Promise<Split> {
+export function createSplit(
+  name: string,
+  people: string[],
+  note: string,
+  photos: File[],
+  group?: { id: string; addedBy: string }, // scanning a bill into a group
+): Promise<Split> {
   const form = new FormData()
   form.append('name', name)
+  if (group) {
+    form.append('group_id', group.id)
+    form.append('added_by', group.addedBy)
+  }
   people.forEach((person) => form.append('people', person))
   form.append('note', note)
   photos.forEach((photo) => form.append('photos', photo))
@@ -153,3 +164,108 @@ export const getMySplits = () => request<{ splits: SplitSummary[] }>('/api/split
 export const saveMyUpiId = (upi_id: string) => request<Me>('/api/me', { ...json({ upi_id }), method: 'PATCH' })
 export const saveFriendUpiId = (name: string, upi_id: string) =>
   request<Me>('/api/me/friends', { ...json({ name, upi_id }), method: 'PUT' })
+
+// --- Groups: Friends, Trip, Flatmates ---
+
+export type GroupKind = 'friends' | 'trip' | 'flat'
+
+export type ActivityEntry =
+  | {
+      type: 'expense'
+      id: string
+      title: string
+      source: 'bill' | 'quick' | 'recurring'
+      total_paise: number
+      paid: Record<string, number>
+      owed: Record<string, number>
+      added_by: string
+      created_at: string
+      split_id: string | null
+    }
+  | {
+      type: 'repayment'
+      id: string
+      sender: string
+      receiver: string
+      amount_paise: number
+      marked_by: string
+      created_at: string
+    }
+
+export type RecurringBill = {
+  id: string
+  title: string
+  amount_paise: number | null // null: changes each month
+  paid_by: string
+  weights: Record<string, number>
+  day_of_month: number
+}
+
+export type Group = {
+  id: string
+  kind: GroupKind
+  name: string
+  members: string[]
+  upi_ids: Record<string, string>
+  start_date: string | null
+  end_date: string | null
+  closed: boolean
+  is_owner: boolean
+  balances: Record<string, number> // positive: gets money back; negative: owes
+  settle_up: { sender: string; receiver: string; amount_paise: number }[]
+  spent: Record<string, number> // each person's own shares
+  total_paise: number
+  activity: ActivityEntry[] // newest first
+  // Flatmates only:
+  recurring?: RecurringBill[]
+  due?: { recurring_id: string; title: string; paid_by: string; month: string; label: string }[]
+  months?: { month: string; label: string; total_paise: number; owed: Record<string, number> }[]
+}
+
+export type GroupSummary = {
+  id: string
+  kind: GroupKind
+  name: string
+  member: string
+  balance_paise: number
+  closed: boolean
+}
+
+export type NewGroup = {
+  kind: GroupKind
+  name: string
+  members: string[]
+  me: string
+  start_date?: string
+  end_date?: string
+}
+
+const put = (body: unknown): RequestInit => ({ ...json(body), method: 'PUT' })
+const del: RequestInit = { method: 'DELETE' }
+const groupUrl = (id: string, rest = '') => `/api/groups/${id}${rest}`
+
+export const createGroup = (group: NewGroup) => request<Group>('/api/groups', json(group))
+export const getMyGroups = () => request<{ groups: GroupSummary[] }>('/api/groups')
+export const getGroup = (id: string) => request<Group>(groupUrl(id))
+export const joinGroup = (id: string, member: string) => request<Group>(groupUrl(id, '/join'), json({ member }))
+export const addQuickExpense = (
+  id: string,
+  expense: { title: string; amount_paise: number; paid_by: string; weights: Record<string, number>; added_by: string },
+) => request<Group>(groupUrl(id, '/expenses'), json(expense))
+export const deleteExpense = (id: string, expenseId: string) => request<Group>(groupUrl(id, `/expenses/${expenseId}`), del)
+export const addRepayment = (
+  id: string,
+  repayment: { sender: string; receiver: string; amount_paise: number; by: string },
+) => request<Group>(groupUrl(id, '/repayments'), json(repayment))
+export const deleteRepayment = (id: string, repaymentId: string) =>
+  request<Group>(groupUrl(id, `/repayments/${repaymentId}`), del)
+export const setGroupUpiId = (id: string, member: string, upi_id: string) =>
+  request<Group>(groupUrl(id, '/upi'), put({ member, upi_id }))
+export const setGroupClosed = (id: string, closed: boolean) => request<Group>(groupUrl(id, '/closed'), put({ closed }))
+export const addRecurring = (
+  id: string,
+  bill: { title: string; amount_paise: number | null; paid_by: string; weights: Record<string, number>; day_of_month: number },
+) => request<Group>(groupUrl(id, '/recurring'), json(bill))
+export const stopRecurring = (id: string, billId: string) => request<Group>(groupUrl(id, `/recurring/${billId}`), del)
+export const enterMonthAmount = (id: string, billId: string, month: string, amount_paise: number, by: string) =>
+  request<Group>(groupUrl(id, `/recurring/${billId}/months/${month}`), put({ amount_paise, by }))

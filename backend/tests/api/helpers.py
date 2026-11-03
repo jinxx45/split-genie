@@ -16,10 +16,11 @@ def fake_google(credential: str) -> dict:
     }
 
 
-def create(client, people=PEOPLE, note="Ravi doesn't drink", photos=(JPEG,), name="Saturday dinner"):
+def create(client, people=PEOPLE, note="Ravi doesn't drink", photos=(JPEG,), name="Saturday dinner", extra=None):
+    """Start a split. `extra`: more form fields, e.g. a group_id."""
     return client.post(
         "/api/splits",
-        data={"name": name, "people": list(people), "note": note},
+        data={"name": name, "people": list(people), "note": note, **(extra or {})},
         files=[("photos", photo) for photo in photos],
     )
 

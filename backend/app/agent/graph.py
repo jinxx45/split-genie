@@ -33,8 +33,8 @@ from app.agent.receipt import (
     totals_match,
 )
 from app.money.settle import settle
-from app.observability import AgentLogHandler
 from app.money.split import Bill, Item, balances, compute_breakdown
+from app.observability import AgentLogHandler
 
 MAX_ATTEMPTS = 3  # the first read plus 2 retries
 MIN_NOTE_WORDS = 2  # "wrong" alone can't be acted on; "Priya brownie" can
@@ -61,6 +61,7 @@ class FinishedReceipt(TypedDict):
 
 class SplitState(TypedDict):
     name: str  # what the split is for, e.g. "Saturday lunch"; shown everywhere the split is
+    group: dict | None  # {"id", "added_by"} when the bill belongs to a group; it's added there when done
     people: list[str]
     note: str
     receipt_ids: list[str]
@@ -82,10 +83,14 @@ class SplitState(TypedDict):
     last_changes: list[dict]  # what the last correction changed, shown on the approval screen
 
 
-def new_split(people: list[str], note: str, receipt_ids: list[str], name: str) -> SplitState:
-    """The starting state for a split. `name` is what it's for, e.g. "Saturday lunch"."""
+def new_split(
+    people: list[str], note: str, receipt_ids: list[str], name: str, group: dict | None = None
+) -> SplitState:
+    """The starting state for a split. `name` is what it's for, e.g. "Saturday lunch". `group`
+    ({"id": ..., "added_by": ...}) is set when the bill is scanned into a group."""
     return {
         "name": name,
+        "group": group,
         "people": people,
         "note": note,
         "receipt_ids": receipt_ids,

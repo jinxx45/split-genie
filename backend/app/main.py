@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.api import auth, splits
+from app.api import auth, groups, splits
 from app.config import settings
 from app.observability import (
     configure_logging,
@@ -23,6 +23,7 @@ api_log = logging.getLogger("split_genie.api")
 app = FastAPI(title="Split Rupya API")
 app.include_router(auth.router)
 app.include_router(splits.router)
+app.include_router(groups.router)
 
 
 @app.middleware("http")

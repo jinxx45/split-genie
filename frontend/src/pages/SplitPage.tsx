@@ -10,11 +10,10 @@ import type { PaymentMark, Split } from '../api'
 import { Approve } from '../steps/Approve'
 import { ClaimItems } from '../steps/ClaimItems'
 import { ConfirmItems } from '../steps/ConfirmItems'
-import { Done } from '../steps/Done'
+import { Done, GroupBillDone } from '../steps/Done'
 import { ReviewItems } from '../steps/ReviewItems'
 import { WhoPaid } from '../steps/WhoPaid'
-import { personColor } from '../colors'
-import { Avatar, ErrorText, PrimaryButton, Screen } from '../ui'
+import { ErrorText, PrimaryButton, Screen, WhoAreYou } from '../ui'
 import { Reading } from './Reading'
 
 export type StepProps<Q> = {
@@ -97,6 +96,10 @@ export function SplitPage() {
     return <WhoAreYou people={split.people} why={why} onChoose={choose} />
   }
 
+  if (done && split.group) {
+    return <GroupBillDone name={split.name} result={done} people={split.people} group={split.group} />
+  }
+
   if (done) {
     const mark = (body: PaymentMark) => send(() => markPayment(id, body), false)
     return <Done name={split.name} result={done} people={split.people} onMark={mark} busy={busy} error={error} />
@@ -153,27 +156,6 @@ export function SplitPage() {
     case 'approve':
       return <Approve key={version} {...props} question={question} />
   }
-}
-
-function WhoAreYou(props: { people: string[]; why: string; onChoose: (person: string) => void }) {
-  return (
-    <Screen title="Who are you?">
-      <p className="mb-5 text-muted">Pick your name to {props.why}.</p>
-      <div className="flex flex-wrap gap-2">
-        {props.people.map((person) => (
-          <button
-            key={person}
-            type="button"
-            onClick={() => props.onChoose(person)}
-            className="flex items-center gap-2 rounded-full bg-white py-1.5 pr-4 pl-1.5 font-semibold"
-          >
-            <Avatar name={person} color={personColor(props.people, person)} />
-            {person}
-          </button>
-        ))}
-      </div>
-    </Screen>
-  )
 }
 
 function message(problem: unknown): string {

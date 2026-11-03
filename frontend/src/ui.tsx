@@ -2,7 +2,8 @@
 
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import type { Weight } from './api'
+import type { GroupKind, Weight } from './api'
+import { personColor } from './colors'
 
 /** The page frame: small header, an optional step indicator, content, and one pinned action. */
 export function Screen(props: {
@@ -146,5 +147,44 @@ export function ShareChip(props: {
       {name}
       {weight === 1 && <span className="ml-1">½</span>}
     </button>
+  )
+}
+
+/** "Pick your name": how someone opening a shared link says who they are. */
+export function WhoAreYou(props: { people: string[]; why: string; onChoose: (person: string) => void }) {
+  return (
+    <Screen title="Who are you?">
+      <p className="mb-5 text-muted">Pick your name to {props.why}.</p>
+      <div className="flex flex-wrap gap-2">
+        {props.people.map((person) => (
+          <button
+            key={person}
+            type="button"
+            onClick={() => props.onChoose(person)}
+            className="flex items-center gap-2 rounded-full bg-white py-1.5 pr-4 pl-1.5 font-semibold"
+          >
+            <Avatar name={person} color={personColor(props.people, person)} />
+            {person}
+          </button>
+        ))}
+      </div>
+    </Screen>
+  )
+}
+
+/** A simple outline icon for each kind of group. */
+export function KindIcon({ kind, className = 'size-5' }: { kind: GroupKind; className?: string }) {
+  const paths: Record<GroupKind, string> = {
+    // two people
+    friends: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 0a2.5 2.5 0 1 0 0-5M3 19c0-3 2.7-5 6-5s6 2 6 5m2-5c2.4.3 4 2 4 5',
+    // a plane
+    trip: 'M3 13l7-2 4-7 2 1-2 6 5-1 2 2-6 2-3 6-2-1 1-5-6 1z',
+    // a house
+    flat: 'M4 11l8-6 8 6M6 10v9h4v-5h4v5h4v-9',
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
+      <path d={paths[kind]} />
+    </svg>
   )
 }

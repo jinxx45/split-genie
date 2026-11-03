@@ -25,6 +25,8 @@ from app.api.accounts import AccountStore, User
 from app.api.auth import current_user, get_accounts, require_user
 from app.api.claims import ClaimStore
 from app.api.db import get_database
+from app.api.group_store import GroupStore
+from app.api.groups import get_groups
 from app.api.limits import RateLimit
 from app.api.payments import PaymentStore
 from app.api.photos import PhotoStore
@@ -87,12 +89,13 @@ def get_claims() -> ClaimStore:
 
 @dataclass
 class Context:
-    """Everything an endpoint needs, as one dependency instead of six."""
+    """Everything an endpoint needs, as one dependency instead of seven."""
 
     graph: Any
     payments: PaymentStore
     claims: ClaimStore
     photos: PhotoStore
+    groups: GroupStore
     accounts: AccountStore
     user: User | None  # None: not signed in
 
@@ -102,10 +105,11 @@ def get_context(
     payments: PaymentStore = Depends(get_payments),
     claims: ClaimStore = Depends(get_claims),
     photos: PhotoStore = Depends(get_photos),
+    groups: GroupStore = Depends(get_groups),
     accounts: AccountStore = Depends(get_accounts),
     user: User | None = Depends(current_user),
 ) -> Context:
-    return Context(graph, payments, claims, photos, accounts, user)
+    return Context(graph, payments, claims, photos, groups, accounts, user)
 
 
 @lru_cache
@@ -154,12 +158,17 @@ def create_split(
     people: list[str] = Form(...),
     note: str = Form("", max_length=MAX_NOTE_LENGTH),
     photos: list[UploadFile] = File(...),
+    group_id: str = Form(""),  # scanning a bill into a group
+    added_by: str = Form(""),  # which group member is scanning it
     context: Context = Depends(get_context),
     _: None = Depends(limit_new_splits),
 ) -> dict:
     """Start a split from receipt photos. Reads the first receipt, then returns its first question."""
     name = clean_split_name(name)
     people = clean_people(people)
+    group = None
+    if group_id:
+        group = check_group_split(context.groups, group_id, people, added_by)
     if not 1 <= len(photos) <= MAX_PHOTOS:
         raise reject(f"Add 1 to {MAX_PHOTOS} receipt photos.")
     receipt_ids = [save_photo(context.photos, photo) for photo in photos]
@@ -169,7 +178,7 @@ def create_split(
         context.accounts.add_split(split_id, context.user.id)
         friends = [person for person in people if person.lower() != context.user.name.lower()]
         context.accounts.remember_friends(context.user.id, friends)
-    run(context.graph, split_id, new_split(people, note.strip(), receipt_ids, name))
+    run(context.graph, split_id, new_split(people, note.strip(), receipt_ids, name, group))
     return describe(context, split_id)
 
 
@@ -189,6 +198,7 @@ def answer_split(split_id: str, body: dict[str, Any], context: Context = Depends
     question = state.interrupts[0].value
 
     run(context.graph, split_id, Command(resume=checked_answer(question, body, state.values)))
+    add_to_group_when_done(context, split_id)
     return describe(context, split_id)
 
 
@@ -267,6 +277,35 @@ def run(graph, split_id: str, graph_input) -> None:
         ) from None
 
 
+def check_group_split(groups: GroupStore, group_id: str, people: list[str], added_by: str) -> dict:
+    """A bill scanned into a group: the group must take expenses, and everyone must be in it."""
+    group = groups.group(group_id)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    if group.closed_at:
+        raise HTTPException(status_code=409, detail="This trip has ended. Reopen it to add expenses.")
+    outsiders = [person for person in people if person not in group.members]
+    if outsiders:
+        raise reject(f"Not in this group: {', '.join(outsiders)}.")
+    if added_by not in group.members:
+        raise reject("Pick who you are in the group first.")
+    return {"id": group_id, "added_by": added_by}
+
+
+def add_to_group_when_done(context: Context, split_id: str) -> None:
+    """Once a group's bill is approved, add it to the group's tab: each person's share, and who
+    paid. Adding it again does nothing, so this is safe to repeat."""
+    state = load(context.graph, split_id)
+    group = state.values.get("group")
+    if not group or state.interrupts or state.next:
+        return
+    values = state.values
+    context.groups.add_expense(
+        group["id"], values["name"], "bill", bill_summary(values["finished"])["paid"], values["shares"],
+        group["added_by"], split_id=split_id,
+    )
+
+
 def can_answer(context: Context, split_id: str) -> bool:
     """Splits started without signing in can be answered by anyone with the link; others only
     by their owner."""
@@ -312,12 +351,21 @@ def describe(context: Context, split_id: str) -> dict:
     return {
         "id": split_id,
         "name": values.get("name", ""),  # .get: splits saved before names existed still open
+        "group": describe_split_group(context, values.get("group")),
         "status": status,
         "people": values["people"],
         "can_answer": can_answer(context, split_id),
         "question": question,
         "result": result,
     }
+
+
+def describe_split_group(context: Context, group: dict | None) -> dict | None:
+    """The group a split belongs to, for a link back to it."""
+    if not group:
+        return None
+    stored = context.groups.group(group["id"])
+    return {"id": group["id"], "name": stored.name if stored else "", "added_by": group["added_by"]}
 
 
 def bill_summary(finished: list[dict]) -> dict:

@@ -5,11 +5,12 @@
 //   "I've paid".
 
 import { useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { saveFriendUpiId, saveMyUpiId } from '../api'
 import type { Payment, PaymentMark, Split } from '../api'
-import { formatRupees, toRupeesText } from '../money'
+import { formatRupees } from '../money'
 import { ErrorText, Paper, Screen } from '../ui'
+import { UPI_ID, upiLink } from '../upi'
 import { useMe } from '../useMe'
 import { BreakdownList, BreakdownPaper, Payments } from './Summary'
 
@@ -17,8 +18,6 @@ type Result = NonNullable<Split['result']>
 type Base = { name: string; result: Result; people: string[] }  // name: the split's name
 type Props = Base & { onMark: (mark: PaymentMark) => void; busy: boolean; error: string | null }
 
-// A UPI ID looks like name@bank.
-const UPI_ID = /^[\w.-]{2,256}@[a-zA-Z]{2,64}$/
 
 export function Done(props: Props) {
   const [params] = useSearchParams()
@@ -27,6 +26,29 @@ export function Done(props: Props) {
     return <FriendView {...props} friend={friend} upiIds={readUpiIds(params)} />
   }
   return <SplitterView {...props} />
+}
+
+/** A bill scanned into a group: it's in the group's tab now, where everyone settles up. */
+export function GroupBillDone(props: Base & { group: { id: string; name: string } }) {
+  const { name, result, people, group } = props
+  return (
+    <Screen
+      title={`Added to ${group.name}`}
+      action={
+        <Link
+          to={`/groups/${group.id}`}
+          className="block w-full rounded-2xl bg-brand px-5 py-4 text-center font-display text-lg font-semibold text-white"
+        >
+          Back to {group.name}
+        </Link>
+      }
+    >
+      <BillSummary name={name} result={result} people={people} />
+      <p className="mt-4 text-muted">Everyone’s share is in the group’s tab. Settle up from the group.</p>
+      <h2 className="mt-8 mb-3 font-display text-xl font-semibold">How it adds up</h2>
+      <BreakdownList breakdown={result.breakdown} people={people} />
+    </Screen>
+  )
 }
 
 function SplitterView({ name, result, people, onMark, busy, error }: Props) {
@@ -266,12 +288,3 @@ function joinNames(names: string[]): string {
   return new Intl.ListFormat('en-IN', { type: 'conjunction' }).format(names)
 }
 
-/** Opens any UPI app (GPay, PhonePe, Paytm…) with the payee and amount filled in. */
-function upiLink(upiId: string, name: string, paise: number): string {
-  // encodeURIComponent, not URLSearchParams: some UPI apps show a "+" for a space literally.
-  const params = { pa: upiId, pn: name, am: toRupeesText(paise), cu: 'INR', tn: 'Split Rupya' }
-  const query = Object.entries(params)
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join('&')
-  return `upi://pay?${query}`
-}

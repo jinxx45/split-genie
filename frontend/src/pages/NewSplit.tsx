@@ -1,13 +1,16 @@
-// Start a split: who was there, an optional note, and photos of the bill.
-// Signed in, you're added for you, recent friends are a tap away, and past splits are below.
+// Start a split: what it's for, who was there, an optional note, and photos of the bill.
+// Signed in, you're added for you, recent friends are a tap away, and your groups and past
+// splits are below. Opened as /?group=<id>, it scans a bill into that group instead.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { ApiError, createSplit } from '../api'
-import { Avatar, ErrorText, PrimaryButton, Screen } from '../ui'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { ApiError, createSplit, getGroup } from '../api'
+import type { Group } from '../api'
+import { rememberedMember } from '../groups'
+import { MemberToggles, PeoplePicker } from '../people'
+import { ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
-import { personColor } from '../colors'
 import { useMe } from '../useMe'
 import { Account } from './Account'
 
@@ -15,12 +18,26 @@ export function NewSplit() {
   const navigate = useNavigate()
   const [splitName, setSplitName] = useState('') // what the split is for
   const [people, setPeople] = useState<string[]>([])
-  const [name, setName] = useState('') // the person's name being typed
   const [note, setNote] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [me, setMe] = useMe()
+
+  // Scanning into a group: its members are the people, and the bill is added to its tab when done.
+  const [params] = useSearchParams()
+  const groupId = params.get('group')
+  const [group, setGroup] = useState<Group | null>(null)
+  const member = groupId ? rememberedMember(groupId) : null
+  useEffect(() => {
+    if (!groupId) return
+    getGroup(groupId)
+      .then((loaded) => {
+        setGroup(loaded)
+        setPeople(loaded.members)
+      })
+      .catch((problem) => setError(problem instanceof ApiError ? problem.message : 'Couldn’t open the group.'))
+  }, [groupId])
 
   // Once we know who's signed in, put them in the split, only while it's still empty, so a name
   // they removed on purpose doesn't come back. Done during render when the name changes (React's
@@ -29,22 +46,7 @@ export function NewSplit() {
   const [seenName, setSeenName] = useState(myName)
   if (myName !== seenName) {
     setSeenName(myName)
-    if (myName && people.length === 0) setPeople([myName])
-  }
-
-  const inSplit = (person: string) => people.some((p) => p.toLowerCase() === person.toLowerCase())
-  const recentFriends = me.friends.filter((friend) => !inSplit(friend.name)).slice(0, 8)
-
-  function addPerson(person = name) {
-    const trimmed = person.trim()
-    if (!trimmed) return
-    if (inSplit(trimmed)) {
-      setError(`${trimmed} is already in the split.`)
-      return
-    }
-    setPeople([...people, trimmed])
-    setName('')
-    setError(null)
+    if (myName && people.length === 0 && !groupId) setPeople([myName])
   }
 
   async function start(event: FormEvent) {
@@ -52,7 +54,8 @@ export function NewSplit() {
     setBusy(true)
     setError(null)
     try {
-      const split = await createSplit(splitName.trim(), people, note, photos)
+      const inGroup = group && member ? { id: group.id, addedBy: member } : undefined
+      const split = await createSplit(splitName.trim(), people, note, photos, inGroup)
       navigate(`/split/${split.id}`)
     } catch (problem) {
       setError(problem instanceof ApiError ? problem.message : 'Couldn’t reach Split Rupya. Check your connection.')
@@ -61,6 +64,29 @@ export function NewSplit() {
   }
 
   if (busy) return <Reading />
+  if (groupId && !group) {
+    return error ? (
+      <Screen title="We couldn’t open this group">
+        <p className="text-muted">{error}</p>
+      </Screen>
+    ) : (
+      <Reading message="Opening your group…" />
+    )
+  }
+  if (group && !member) {
+    // They need to say who they are in the group first; the group page asks.
+    return (
+      <Screen title="Who are you?">
+        <p className="text-muted">
+          Open{' '}
+          <Link to={`/groups/${group.id}`} className="font-semibold underline">
+            {group.name}
+          </Link>{' '}
+          and pick your name first.
+        </p>
+      </Screen>
+    )
+  }
 
   const missing = !splitName.trim()
     ? 'Name the split first'
@@ -74,7 +100,7 @@ export function NewSplit() {
   return (
     <form onSubmit={start}>
       <Screen
-        title="Split a bill"
+        title={group ? `Scan a bill into ${group.name}` : 'Split a bill'}
         action={
           <PrimaryButton type="submit" disabled={!ready}>
             {missing ?? 'Read the bill'}
@@ -95,60 +121,10 @@ export function NewSplit() {
         </label>
 
         <p className="mt-6 mb-2 font-display text-lg font-semibold">Who was there?</p>
-        <div className="flex flex-wrap gap-2">
-          {people.map((person) => (
-            <button
-              key={person}
-              type="button"
-              onClick={() => setPeople(people.filter((p) => p !== person))}
-              aria-label={`Remove ${person}`}
-              className="flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 font-semibold"
-            >
-              <Avatar name={person} color={personColor(people, person)} />
-              {person}
-              <span aria-hidden className="text-muted">×</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                addPerson()
-              }
-            }}
-            placeholder={people.length ? 'Add another name' : 'Add a name'}
-            maxLength={40}
-            enterKeyHint="done"
-            className="min-w-0 flex-1 rounded-2xl bg-white px-4 py-3"
-          />
-          <button
-            type="button"
-            onClick={() => addPerson()}
-            disabled={!name.trim()}
-            className="rounded-2xl bg-white px-5 font-display font-semibold text-brand disabled:text-muted/50"
-          >
-            Add
-          </button>
-        </div>
-
-        {recentFriends.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2" aria-label="Recent friends">
-            {recentFriends.map((friend) => (
-              <button
-                key={friend.name}
-                type="button"
-                onClick={() => addPerson(friend.name)}
-                className="rounded-full border-2 border-dashed border-steel-dark px-3 py-1 text-sm font-semibold text-muted"
-              >
-                + {friend.name}
-              </button>
-            ))}
-          </div>
+        {group ? (
+          <MemberToggles members={group.members} chosen={people} onChange={setPeople} />
+        ) : (
+          <PeoplePicker people={people} onChange={setPeople} suggestions={me.friends.map((friend) => friend.name)} />
         )}
 
         <label className="mt-8 block">
@@ -185,7 +161,7 @@ export function NewSplit() {
 
         {error && <ErrorText>{error}</ErrorText>}
 
-        <Account me={me} setMe={setMe} />
+        {!group && <Account me={me} setMe={setMe} />}
 
         <p className="mt-10 text-center text-sm text-muted">
           <Link to="/privacy" className="underline">

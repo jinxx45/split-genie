@@ -12,10 +12,11 @@ from fastapi.testclient import TestClient
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.graph import build_graph
-from app.api import auth, splits
+from app.api import auth, groups, splits
 from app.api.accounts import AccountStore
 from app.api.claims import ClaimStore
 from app.api.db import Database
+from app.api.group_store import GroupStore
 from app.api.limits import RateLimit
 from app.api.payments import PaymentStore
 from app.api.photos import PhotoStore
@@ -41,6 +42,8 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[splits.get_payments] = lambda: payments
     app.dependency_overrides[splits.get_claims] = lambda: claims
     app.dependency_overrides[splits.get_photos] = lambda: photos
+    group_store = GroupStore(database)
+    app.dependency_overrides[groups.get_groups] = lambda: group_store
     split_limit = RateLimit(100, window_seconds=3600)  # each test starts with no splits counted
     app.dependency_overrides[splits.get_split_limit] = lambda: split_limit
     app.dependency_overrides[auth.get_accounts] = lambda: accounts
@@ -49,5 +52,8 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides.clear()
     if database.postgres:  # a shared database: leave it empty for the next test
         with database.connection() as connection:
-            connection.execute("TRUNCATE payments, claims, photos, users, split_owners, friends")
+            connection.execute(
+                "TRUNCATE payments, claims, photos, users, split_owners, friends,"
+                " groups, group_users, expenses, repayments, recurring"
+            )
         database.pool.close()
