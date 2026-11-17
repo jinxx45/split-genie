@@ -1,6 +1,6 @@
 // Draws the "Wrapped" card: one tall picture of a group's highlights, made to be shared.
 // It's drawn on a canvas (not built from page elements) so the picture people share is exactly
-// the picture on screen, in the app's own fonts. The card is always black and saffron, whatever
+// the picture on screen, in the app's own fonts. The card is always black and blue, whatever
 // theme is on: it leaves the app, so it carries the brand.
 
 import type { Wrapped } from './api'
@@ -11,11 +11,21 @@ export const CARD = { width: 1080, height: 1920 } // a phone story's shape, 9:16
 
 const INK = '#0a0a0a'
 const PAPER = '#f6f4ee'
-const SAFFRON = '#f2a93b'
 const MUTED = '#a1a5a9'
 const TILE = '#17171a'
 const LINE = '#2e2e33'
 const GOOD = '#7fd4a0'
+
+// The brand accent, read from the stylesheet so the app and the card can never disagree about
+// it. The card is always dark with the accent, whatever theme the app is in, so these are the
+// brand colours it borrows; `drawWrapped` sets them before anything is painted.
+//
+// ACCENT fills the headline block, where dark text sits on it. STRONG is the same blue with more
+// colour left in it, for the small labels and names: at the accent's own lightness those would be
+// indistinguishable from the card's white text.
+const FALLBACK = { accent: '#dcf0fd', strong: '#8fc0ec' }
+let ACCENT = FALLBACK.accent
+let STRONG = FALLBACK.strong
 
 const DISPLAY = '"Bricolage Grotesque Variable", system-ui, sans-serif'
 const BODY = '"DM Sans Variable", system-ui, sans-serif'
@@ -80,7 +90,7 @@ function tile(
   box(ctx, x, y, width, 290, TILE, LINE)
   ctx.fillStyle = MUTED
   ctx.fillText(fit(ctx, parts.label, inside, 34, 26, `500 SIZE ${BODY}`), x + 36, y + 70)
-  ctx.fillStyle = parts.accent ? SAFFRON : PAPER
+  ctx.fillStyle = parts.accent ? STRONG : PAPER
   ctx.fillText(fit(ctx, parts.value, inside, 84, 44, `800 SIZE ${DISPLAY}`), x + 36, y + 172)
   ctx.fillStyle = MUTED
   ctx.fillText(fit(ctx, parts.note, inside, 34, 26, `500 SIZE ${BODY}`), x + 36, y + 238)
@@ -93,6 +103,9 @@ export function drawWrapped(canvas: HTMLCanvasElement, wrapped: Wrapped, mark: H
   canvas.height = CARD.height
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+  const brand = getComputedStyle(document.documentElement)
+  ACCENT = brand.getPropertyValue('--color-accent').trim() || FALLBACK.accent
+  STRONG = brand.getPropertyValue('--color-accent-strong').trim() || FALLBACK.strong
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = INK
   ctx.fillRect(0, 0, CARD.width, CARD.height)
@@ -111,7 +124,7 @@ export function drawWrapped(canvas: HTMLCanvasElement, wrapped: Wrapped, mark: H
   ctx.fillText('Rupya', x, 128)
 
   // What it is, its name and when.
-  ctx.fillStyle = SAFFRON
+  ctx.fillStyle = STRONG
   ctx.font = `700 40px ${BODY}`
   ctx.fillText(wrapped.kind === 'trip' ? 'Trip wrapped' : 'Wrapped', EDGE, 300)
   ctx.fillStyle = PAPER
@@ -122,7 +135,7 @@ export function drawWrapped(canvas: HTMLCanvasElement, wrapped: Wrapped, mark: H
   ctx.fillText(`${when}, ${wrapped.people} people`, EDGE, 500)
 
   // The headline: the total.
-  box(ctx, EDGE, 570, INNER, 370, SAFFRON)
+  box(ctx, EDGE, 570, INNER, 370, ACCENT)
   ctx.fillStyle = INK
   ctx.font = `700 40px ${BODY}`
   ctx.fillText('Together you spent', EDGE + 48, 660)
@@ -158,7 +171,7 @@ export function drawWrapped(canvas: HTMLCanvasElement, wrapped: Wrapped, mark: H
 
   // The footer: where things stand, and where to find the app.
   const settled = wrapped.payments_left === 0
-  ctx.fillStyle = settled ? GOOD : SAFFRON
+  ctx.fillStyle = settled ? GOOD : STRONG
   ctx.font = `700 38px ${BODY}`
   ctx.fillText(settled ? 'All settled' : `${wrapped.payments_left} ${wrapped.payments_left === 1 ? 'payment' : 'payments'} to go`, EDGE, 1840)
   ctx.fillStyle = MUTED

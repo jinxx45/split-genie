@@ -45,7 +45,7 @@ export function SettleTabs(ctx: GroupCtx) {
                 setTab(option.id)
                 setOpen(null)
               }}
-              className={`rounded-[1.25rem] border-2 border-line p-3.5 text-left transition ${on ? 'bg-saffron text-coal pop-shadow' : 'bg-white'}`}
+              className={`rounded-[1.25rem] border-2 border-line p-3.5 text-left transition ${on ? 'bg-accent text-coal pop-shadow' : 'bg-white'}`}
             >
               <span className={`block text-sm font-bold ${on ? '' : 'text-muted'}`}>{option.label}</span>
               <span className={`amount block text-2xl ${on ? 'font-extrabold' : 'font-bold'}`}>

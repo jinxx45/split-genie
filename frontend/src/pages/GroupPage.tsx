@@ -114,7 +114,7 @@ export function GroupPage() {
       </p>
 
       {group.closed && (
-        <p className="mb-4 rounded-2xl bg-saffron-soft p-4">
+        <p className="mb-4 rounded-2xl bg-accent-soft p-4">
           <span className="font-semibold">This trip has ended.</span> Settle up below; no new expenses can be added.
         </p>
       )}
@@ -220,7 +220,7 @@ function WrappedLink({ group }: { group: Group }) {
       to={`/groups/${group.id}/wrapped`}
       className="mt-6 mr-1 flex items-center gap-4 rounded-[1.25rem] border-2 border-line bg-coal p-4 text-snow pop-shadow"
     >
-      <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-saffron text-coal">
+      <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-coal">
         <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 3l2.2 5.6L20 9.3l-4.5 3.9L17 19l-5-3.1L7 19l1.5-5.8L4 9.3l5.8-.7Z" />
         </svg>
@@ -295,7 +295,7 @@ function DueBills({ group, you, busy, act }: Ctx) {
           const key = `${due.recurring_id}-${due.month}`
           const paise = parseRupees(amounts[key] ?? '')
           return (
-            <li key={key} className="rounded-2xl bg-saffron-soft p-4">
+            <li key={key} className="rounded-2xl bg-accent-soft p-4">
               <p className="font-semibold">
                 {due.title}, {due.label}
               </p>
@@ -481,7 +481,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
               .join(', ')}
             {yours.length > 0 &&
               (unpaid.length ? (
-                <span className="rounded-full bg-saffron-soft px-2 font-semibold text-saffron-deep">
+                <span className="rounded-full bg-accent-soft px-2 font-semibold text-accent-deep">
                   you owe {formatRupees(unpaid.reduce((sum, owe) => sum + left(owe), 0))}
                 </span>
               ) : (

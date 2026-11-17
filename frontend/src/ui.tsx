@@ -55,7 +55,7 @@ export function Logo() {
 /** Three swatches at the top right: tap one to switch the app's look. Each swatch is drawn in
  * its own theme's colours, whatever theme is on. */
 const SWATCHES: Record<Theme, string> = {
-  pop: 'border-2 border-[#0a0a0a] bg-[#f2a93b]',
+  pop: 'border-2 border-[#0a0a0a] bg-[#dcf0fd]',
   clean: 'border border-[#cfd4d7] bg-[#ffffff]',
   midnight: 'border border-[#4a4a50] bg-[#0a0a0a]',
 }

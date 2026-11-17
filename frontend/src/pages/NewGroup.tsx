@@ -92,7 +92,7 @@ export function NewGroup() {
               aria-checked={kind === option.kind}
               onClick={() => setKind(option.kind)}
               className={`flex w-full items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
-                kind === option.kind ? 'border-ink bg-saffron-soft' : 'border-ink/25 bg-white'
+                kind === option.kind ? 'border-ink bg-accent-soft' : 'border-ink/25 bg-white'
               }`}
             >
               <span

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, saffron and paper.
+/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, sky blue and paper.
    These are the "Pop" theme, the default: a paper page, white tiles with a black outline, and a
    hard shadow on the main action. "Clean" and "Midnight" below override the same names, so
    every screen follows the theme the person picks (see theme.ts). */
@@ -13,13 +13,16 @@
   --color-steel: #ebe7dc; /* quiet fills and dividers on cards */
   --color-steel-dark: #0a0a0a; /* outlines of unselected chips and dashed edges */
   --color-line: #0a0a0a; /* outlines of tiles, avatars and chevrons */
-  --color-saffron: #f2a93b; /* accents and highlights only, never body text on white */
-  --color-saffron-soft: #fcefd9;
-  --color-saffron-deep: #6b4200; /* text on saffron-soft */
+  --color-accent: #dcf0fd; /* the brand colour: fills only, never text */
+  /* The same blue with enough colour left to read as a line, a ring or small text, where the
+     pale fill above would be mistaken for white. */
+  --color-accent-strong: #8fc0ec;
+  --color-accent-soft: #e8f4fd; /* a tint behind a pill or a highlighted row */
+  --color-accent-deep: #184a73; /* text on accent-soft */
   --color-good: #1e5c3c; /* "settled" */
   --color-good-soft: #e3efe7;
   --color-chilli: #c73a2b;
-  --color-coal: #0a0a0a; /* text on saffron: dark in every theme */
+  --color-coal: #0a0a0a; /* text on the accent: dark in every theme */
   --color-snow: #ffffff; /* text on a person's colour: white in every theme */
 
   --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
@@ -31,7 +34,7 @@
   --shadow-pop: 4px 4px 0 var(--color-ink); /* the hard shadow, for the main action only */
   --tile-border: 2px;
   --tile-radius: 1.25rem;
-  --btn-bg: var(--color-saffron);
+  --btn-bg: var(--color-accent);
   --btn-fg: var(--color-coal);
   --btn-border: 2px solid var(--color-ink);
   --btn-radius: 1.125rem;
@@ -53,7 +56,7 @@
   --btn-radius: 999px;
 }
 
-/* Midnight: black page, dark cards, saffron as the light. White and brand swap roles, so a
+/* Midnight: black page, dark cards, the accent as the light. White and brand swap roles, so a
    "white card" is dark and a "brand button" is light with dark text. */
 :root[data-theme='midnight'] {
   color-scheme: dark;
@@ -65,8 +68,8 @@
   --color-steel: #26262a;
   --color-steel-dark: #4a4a50;
   --color-line: #2e2e33;
-  --color-saffron-soft: #3a2c12;
-  --color-saffron-deep: #f2a93b;
+  --color-accent-soft: #12283a;
+  --color-accent-deep: #8fc0ec;
   --color-good: #7fd4a0;
   --color-good-soft: #14301f;
   --color-chilli: #ff7a6b;
@@ -160,6 +163,6 @@ html {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-saffron);
+  outline: 3px solid var(--color-accent-strong);
   outline-offset: 2px;
 }

@@ -27,8 +27,8 @@ export function Home() {
       <div className={`mr-1 grid grid-cols-2 gap-3 ${user ? 'mt-4' : ''}`}>
         {/* A label around a hidden file input: tapping it opens the phone's own "Camera or Gallery"
             chooser, with no extra screen first. */}
-        <label className={`${TILE} col-span-2 cursor-pointer items-center gap-4 bg-saffron text-coal pop-shadow`}>
-          <span aria-hidden className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-coal text-saffron">
+        <label className={`${TILE} col-span-2 cursor-pointer items-center gap-4 bg-accent text-coal pop-shadow`}>
+          <span aria-hidden className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-coal text-accent">
             <CameraIcon />
           </span>
           <span>
@@ -44,7 +44,7 @@ export function Home() {
           />
         </label>
         <Link to="/instant" className={`${TILE} min-h-26 flex-col justify-between bg-ink text-paper`}>
-          <span aria-hidden className="text-saffron">
+          <span aria-hidden className="text-accent-strong">
             <BoltIcon />
           </span>
           <span className="font-display text-lg font-bold">Instant split</span>

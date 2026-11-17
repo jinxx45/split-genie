@@ -5,5 +5,5 @@
     <clipPath id="right"><rect x="50" y="0" width="50" height="100"/></clipPath>
   </defs>
   <use href="#rupee" fill="#F6F4EE" clip-path="url(#left)"/>
-  <g transform="translate(5 -7)"><use href="#rupee" fill="#F2A93B" clip-path="url(#right)"/></g>
+  <g transform="translate(5 -7)"><use href="#rupee" fill="#8FC0EC" clip-path="url(#right)"/></g>
 </svg>

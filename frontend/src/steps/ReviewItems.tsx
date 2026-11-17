@@ -183,7 +183,7 @@ function ItemCard(props: {
   }
 
   return (
-    <li className={`rounded-2xl p-4 transition-colors ${unfinished ? 'bg-saffron-soft ring-2 ring-saffron' : 'bg-white'}`}>
+    <li className={`rounded-2xl p-4 transition-colors ${unfinished ? 'bg-accent-soft ring-2 ring-accent-strong' : 'bg-white'}`}>
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-semibold">{itemLabel(entry.item)}</span>
         <span className="amount">{formatRupees(entry.item.amount_paise)}</span>
