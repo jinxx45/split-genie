@@ -1,13 +1,14 @@
 // Add to a group's tab, at /groups/:id/add: scan a bill, add a quick expense (a cab, tickets),
 // or, for flatmates (/groups/:id/add?monthly), a monthly bill like rent or electricity.
+// With ?edit=<expense id> the same form corrects an expense that's already there.
 
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ApiError, addQuickExpense, addRecurring, getGroup } from '../api'
-import type { Group } from '../api'
+import { ApiError, addQuickExpense, addRecurring, editExpense, getGroup } from '../api'
+import type { ActivityEntry, Group } from '../api'
 import { rememberedMember } from '../groups'
-import { parseRupees } from '../money'
+import { parseRupees, toRupeesText } from '../money'
 import { MemberToggles, PayerPicker, ShareSteppers } from '../people'
 import { ErrorText, PrimaryButton, Screen } from '../ui'
 import { Reading } from './Reading'
@@ -39,23 +40,48 @@ export function AddExpense() {
     return <Navigate to={`/groups/${id}`} replace /> // the group page asks who they are first
   }
 
-  const monthly = group.kind === 'flat' && params.has('monthly')
-  // key: switching between a quick expense and a monthly bill starts a fresh form.
+  // Editing: the expense to correct. A scanned bill keeps its item-by-item split, so it can't be.
+  const editing = group.activity.find(
+    (entry): entry is Expense => entry.type === 'expense' && entry.id === params.get('edit') && entry.source !== 'bill',
+  )
+  if (params.has('edit') && !editing) return <Navigate to={`/groups/${id}`} replace />
+
+  const monthly = group.kind === 'flat' && params.has('monthly') && !editing
+  // key: switching between a quick expense, a monthly bill and an edit starts a fresh form.
   return (
-    <ExpenseForm key={String(monthly)} group={group} you={you} monthly={monthly} onDone={() => navigate(`/groups/${id}`)} />
+    <ExpenseForm
+      key={editing?.id ?? String(monthly)}
+      group={group}
+      you={you}
+      monthly={monthly}
+      editing={editing}
+      onDone={() => navigate(`/groups/${id}`)}
+    />
   )
 }
 
-function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDone: () => void }) {
-  const { group, you, monthly } = props
-  const [title, setTitle] = useState('')
-  const [amount, setAmount] = useState('')
+type Expense = Extract<ActivityEntry, { type: 'expense' }>
+
+/** The shares behind an expense's amounts, as whole numbers: ₹300, ₹300, ₹600 -> 1, 1, 2.
+ * Only the amounts are stored, so this reads them back against the smallest one. */
+function sharesOf(owed: Record<string, number>): Record<string, number> {
+  const smallest = Math.min(...Object.values(owed))
+  return Object.fromEntries(
+    Object.entries(owed).map(([person, amount]) => [person, Math.min(9, Math.max(1, Math.round(amount / smallest)))]),
+  )
+}
+
+function ExpenseForm(props: { group: Group; you: string; monthly: boolean; editing?: Expense; onDone: () => void }) {
+  const { group, you, monthly, editing } = props
+  const was = editing && sharesOf(editing.owed) // the shares it had, when editing
+  const [title, setTitle] = useState(editing?.title ?? '')
+  const [amount, setAmount] = useState(editing ? toRupeesText(editing.total_paise).replace(/\.00$/, '') : '')
   const [changesMonthly, setChangesMonthly] = useState(false) // monthly bills: electricity rather than rent
   const [day, setDay] = useState(1)
-  const [paidBy, setPaidBy] = useState(you)
-  const [sharedBy, setSharedBy] = useState<string[]>(group.members)
-  const [uneven, setUneven] = useState(false)
-  const [weights, setWeights] = useState<Record<string, number>>({})
+  const [paidBy, setPaidBy] = useState(editing ? Object.keys(editing.paid)[0] : you)
+  const [sharedBy, setSharedBy] = useState<string[]>(was ? group.members.filter((member) => member in was) : group.members)
+  const [uneven, setUneven] = useState(was ? Object.values(was).some((share) => share !== 1) : false)
+  const [weights, setWeights] = useState<Record<string, number>>(was ?? {})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -81,7 +107,8 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
         await addRecurring(group.id, bill)
       } else {
         if (paise === null) return // can't happen: the button stays off until there's an amount
-        await addQuickExpense(group.id, { title: title.trim(), amount_paise: paise, paid_by: paidBy, weights: shares, added_by: you })
+        const expense = { title: title.trim(), amount_paise: paise, paid_by: paidBy, weights: shares, added_by: you }
+        await (editing ? editExpense(group.id, editing.id, expense) : addQuickExpense(group.id, expense))
       }
       props.onDone()
     } catch (problem) {
@@ -93,14 +120,14 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
   return (
     <form onSubmit={save}>
       <Screen
-        title={monthly ? 'Add a monthly bill' : `Add to ${group.name}`}
+        title={editing ? 'Edit expense' : monthly ? 'Add a monthly bill' : `Add to ${group.name}`}
         action={
           <PrimaryButton type="submit" busy={busy} disabled={missing !== null}>
-            {missing ?? (monthly ? 'Add monthly bill' : 'Add expense')}
+            {missing ?? (editing ? 'Save changes' : monthly ? 'Add monthly bill' : 'Add expense')}
           </PrimaryButton>
         }
       >
-        {!monthly && (
+        {!monthly && !editing && (
           <Link
             to={`/scan?group=${group.id}`}
             className="mb-6 flex items-center gap-4 rounded-2xl border-2 border-dashed border-steel-dark bg-white/60 p-4"
@@ -113,7 +140,7 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
           </Link>
         )}
 
-        <p className="mb-3 font-display text-lg font-semibold">{monthly ? 'The bill' : 'Or a quick expense'}</p>
+        <p className="mb-3 font-display text-lg font-semibold">{monthly ? 'The bill' : editing ? 'What and how much' : 'Or a quick expense'}</p>
         <div className="grid grid-cols-[1fr_8rem] gap-2">
           <input
             value={title}

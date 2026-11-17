@@ -234,6 +234,17 @@ class GroupStore(Store):
                 ),
             )
 
+    def update_expense(
+        self, group_id: str, expense_id: str, title: str, paid: dict[str, int], owed: dict[str, int]
+    ) -> None:
+        """Replace an expense's name, who paid and everyone's share. When and by whom it was
+        added stay as they were."""
+        with self.connection() as connection:
+            connection.execute(
+                "UPDATE expenses SET title = ?, paid = ?, owed = ? WHERE id = ? AND group_id = ?",
+                (title, json.dumps(paid), json.dumps(owed), expense_id, group_id),
+            )
+
     def expenses(self, group_id: str) -> list[ExpenseRow]:
         with self.connection() as connection:
             rows = connection.execute(

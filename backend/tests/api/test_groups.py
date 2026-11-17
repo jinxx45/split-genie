@@ -153,6 +153,46 @@ def test_an_expense_can_be_deleted(client):
     assert group["activity"] == [] and group["balances"]["Priya"] == 0
 
 
+def test_an_expense_can_be_edited(client):
+    group_id = new_group(client).json()["id"]
+    cab = quick(client, group_id, 90000, title="Cab").json()["activity"][0]
+
+    body = {"title": "Cab to Baga", "amount_paise": 60000, "paid_by": "Arun", "weights": {"Priya": 1, "Arun": 1},
+            "added_by": "Ravi"}
+    group = client.put(f"/api/groups/{group_id}/expenses/{cab['id']}", json=body).json()
+
+    [edited] = group["activity"]
+    assert (edited["id"], edited["title"], edited["total_paise"]) == (cab["id"], "Cab to Baga", 60000)
+    assert edited["paid"] == {"Arun": 60000} and edited["owed"] == {"Priya": 30000, "Arun": 30000}
+    assert (edited["added_by"], edited["created_at"]) == ("Priya", cab["created_at"])  # unchanged
+    assert group["balances"] == {"Priya": -30000, "Arun": 30000, "Ravi": 0}
+
+
+def test_edits_are_checked_like_new_expenses(client):
+    group_id = new_group(client).json()["id"]
+    cab_id = quick(client, group_id, 90000).json()["activity"][0]["id"]
+    body = {"title": "Cab", "amount_paise": 1000, "paid_by": "Rahul", "weights": {"Priya": 1}, "added_by": "Priya"}
+
+    assert "Not in this group: Rahul" in client.put(f"/api/groups/{group_id}/expenses/{cab_id}", json=body).json()["detail"]
+    body["paid_by"] = "Priya"
+    assert client.put(f"/api/groups/{group_id}/expenses/nope", json=body).status_code == 404
+
+
+def test_a_scanned_bill_cant_be_edited(client):
+    group_id = new_group(client).json()["id"]
+    split = create(client, people=MEMBERS, extra={"group_id": group_id, "added_by": "Arun"}).json()
+    answer(client, split["id"], DINNER)
+    answer(client, split["id"], {"changes": {"1": {"weights": {"Arun": 1, "Ravi": 1}, "by_count": True}}})
+    answer(client, split["id"], {"paid": {"Priya": 123200}})
+    answer(client, split["id"], {"approved": True})
+    bill_id = client.get(f"/api/groups/{group_id}").json()["activity"][0]["id"]
+
+    body = {"title": "Dinner", "amount_paise": 1000, "paid_by": "Priya", "weights": {"Priya": 1}, "added_by": "Priya"}
+    response = client.put(f"/api/groups/{group_id}/expenses/{bill_id}", json=body)
+
+    assert response.status_code == 422 and "scanned bill can't be edited" in response.json()["detail"]
+
+
 @pytest.mark.parametrize(
     ("change", "message"),
     [

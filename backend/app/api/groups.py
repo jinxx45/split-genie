@@ -172,6 +172,26 @@ def add_quick_expense(
     return describe_group(groups, group, user)
 
 
+@router.put("/{group_id}/expenses/{expense_id}")
+def edit_expense(
+    group_id: str, expense_id: str, body: QuickExpenseIn, user: User | None = Depends(current_user),
+    groups: GroupStore = Depends(get_groups),
+) -> dict:
+    """Correct an expense: its name, amount, who paid and who shares it. The shares are worked
+    out again from the new amount. A scanned bill keeps its item-by-item split, so it can't be
+    edited here."""
+    group = load_open(groups, group_id)
+    expense = next((e for e in groups.expenses(group_id) if e.id == expense_id), None)
+    if expense is None:
+        raise HTTPException(status_code=404, detail="That expense isn't in this group.")
+    if expense.source == "bill":
+        raise reject("A scanned bill can't be edited here. Remove it and scan it again.")
+    check_member(group, body.paid_by, body.added_by, *body.weights)
+    owed = share_amount(body.amount_paise, body.weights)
+    groups.update_expense(group_id, expense_id, " ".join(body.title.split()), {body.paid_by: body.amount_paise}, owed)
+    return describe_group(groups, group, user)
+
+
 @router.delete("/{group_id}/expenses/{expense_id}")
 def delete_expense(
     group_id: str, expense_id: str, user: User | None = Depends(current_user), groups: GroupStore = Depends(get_groups)

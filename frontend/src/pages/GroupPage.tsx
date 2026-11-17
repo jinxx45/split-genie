@@ -526,15 +526,68 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
                 </>
               )}
             </span>
+            {!group.closed && entry.source !== 'bill' && (
+              <Link to={`/groups/${group.id}/add?edit=${entry.id}`} className="font-semibold text-ink underline">
+                Edit
+              </Link>
+            )}
             {!group.closed && (
               <button type="button" disabled={busy} onClick={props.onRemove} className={`font-semibold ${props.removing ? 'text-chilli' : ''}`}>
                 {props.removing ? 'Tap to remove' : 'Remove'}
               </button>
             )}
           </p>
+          <AskAbout group={group} you={you} entry={entry} />
         </div>
       )}
     </li>
+  )
+}
+
+/** A question about one expense, sent as a WhatsApp message with the expense named and the
+ * group's link, to whichever chat the person picks (the group's, or one friend). */
+function AskAbout({ group, you, entry }: { group: Group; you: string; entry: Expense }) {
+  const [question, setQuestion] = useState('')
+  const asked = question.trim()
+  const payers = Object.keys(entry.paid).join(' and ')
+  const text = [
+    `*${group.name}*: ${you} has a question about *${entry.title}* (${formatRupees(entry.total_paise)}, ${payers} paid):`,
+    asked,
+    '',
+    'See it here:',
+    groupLink(group),
+  ].join('\n')
+
+  return (
+    <div className="mt-3 border-t border-steel pt-3">
+      <label htmlFor={`ask-${entry.id}`} className="block text-muted">
+        Something not clear? Ask about it
+      </label>
+      <div className="mt-1 flex gap-2">
+        <input
+          id={`ask-${entry.id}`}
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="Why is my part more?"
+          maxLength={200}
+          className="min-w-0 flex-1 rounded-lg bg-steel px-3 py-2"
+        />
+        {asked ? (
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg bg-brand px-3 py-2 font-display font-semibold whitespace-nowrap text-white"
+          >
+            Ask on WhatsApp
+          </a>
+        ) : (
+          <span aria-disabled className="rounded-lg bg-muted/40 px-3 py-2 font-display font-semibold whitespace-nowrap text-white">
+            Ask on WhatsApp
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 

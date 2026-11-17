@@ -271,6 +271,11 @@ export const addQuickExpense = (
   id: string,
   expense: { title: string; amount_paise: number; paid_by: string; weights: Record<string, number>; added_by: string },
 ) => request<Group>(groupUrl(id, '/expenses'), json(expense))
+export const editExpense = (
+  id: string,
+  expenseId: string,
+  expense: { title: string; amount_paise: number; paid_by: string; weights: Record<string, number>; added_by: string },
+) => request<Group>(groupUrl(id, `/expenses/${expenseId}`), put(expense))
 export const deleteExpense = (id: string, expenseId: string) => request<Group>(groupUrl(id, `/expenses/${expenseId}`), del)
 export const addRepayment = (
   id: string,
