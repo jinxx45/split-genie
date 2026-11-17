@@ -188,6 +188,21 @@ class GroupStore(Store):
                 (json.dumps([*group.members, name]), group_id),
             )
 
+    def remove_member(self, group_id: str, name: str) -> None:
+        group = self.group(group_id)
+        with self.connection() as connection:
+            connection.execute(
+                "UPDATE groups SET members = ? WHERE id = ?",
+                (json.dumps([member for member in group.members if member != name]), group_id),
+            )
+
+    def set_details(self, group_id: str, name: str, start_date: str | None, end_date: str | None) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                "UPDATE groups SET name = ?, start_date = ?, end_date = ? WHERE id = ?",
+                (name, start_date, end_date, group_id),
+            )
+
     # --- Which accounts belong to which groups ---
 
     def join(self, group_id: str, user_id: str, member: str) -> None:

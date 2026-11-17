@@ -80,6 +80,12 @@ class AddMemberIn(BaseModel):
     name: Member
 
 
+class DetailsIn(BaseModel):
+    name: Name
+    start_date: date | None = None  # trips only
+    end_date: date | None = None
+
+
 class QuickExpenseIn(BaseModel):
     title: Name
     amount_paise: int = Field(ge=1, le=MAX_EXPENSE_PAISE)
@@ -186,6 +192,42 @@ def add_member(
     if len(group.members) >= MAX_PEOPLE:
         raise reject(f"A group can have at most {MAX_PEOPLE} people.")
     groups.add_member(group_id, name)
+    return describe_group(groups, load(groups, group_id), user)
+
+
+@router.delete("/{group_id}/members/{member}")
+def remove_member(
+    group_id: str, member: str, user: User | None = Depends(current_user), groups: GroupStore = Depends(get_groups)
+) -> dict:
+    """Take someone off the list, e.g. a name added by mistake. Only while they have no activity:
+    once they've paid, owed, or been repaid anything, the balances are calculated over the
+    member list, so removing them would make the maths wrong for everyone else too."""
+    group = load(groups, group_id)
+    check_member(group, member)
+    if len(group.members) <= 2:
+        raise reject("A group needs at least 2 people.")
+    if member_has_activity(groups, group_id, member):
+        raise reject(f"{member} already has activity in this group, so they can’t be removed.")
+    groups.remove_member(group_id, member)
+    return describe_group(groups, load(groups, group_id), user)
+
+
+@router.put("/{group_id}/details")
+def set_details(
+    group_id: str, body: DetailsIn, user: User | None = Depends(current_user), groups: GroupStore = Depends(get_groups)
+) -> dict:
+    """Rename the group, or for a trip, change its dates."""
+    group = load(groups, group_id)
+    name = " ".join(body.name.split())
+    if not name:
+        raise reject("Give the group a name.")
+    start, end = None, None
+    if group.kind == "trip":
+        if body.start_date and body.end_date and body.end_date < body.start_date:
+            raise reject("The trip can't end before it starts.")
+        start = body.start_date.isoformat() if body.start_date else None
+        end = body.end_date.isoformat() if body.end_date else None
+    groups.set_details(group_id, name, start, end)
     return describe_group(groups, load(groups, group_id), user)
 
 
@@ -348,6 +390,20 @@ def check_member(group: Group, *names: str) -> None:
     unknown = sorted({name for name in names if name not in group.members})
     if unknown:
         raise reject(f"Not in this group: {', '.join(unknown)}.")
+
+
+def member_has_activity(groups: GroupStore, group_id: str, member: str) -> bool:
+    """Whether this member has ever paid, owed, or been repaid anything in the group."""
+    for expense in groups.expenses(group_id):
+        if member in expense.paid or member in expense.owed:
+            return True
+    for repayment in groups.repayments(group_id):
+        if member in (repayment.sender, repayment.receiver):
+            return True
+    for bill in groups.recurring(group_id):
+        if member == bill.paid_by or member in bill.weights:
+            return True
+    return False
 
 
 def today_ist() -> date:

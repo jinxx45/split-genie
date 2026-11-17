@@ -15,7 +15,9 @@ import {
   enterMonthAmount,
   getGroup,
   joinGroup,
+  removeMember,
   setGroupClosed,
+  setGroupDetails,
   stopRecurring,
 } from '../api'
 import type { ActivityEntry, Group } from '../api'
@@ -113,6 +115,8 @@ export function GroupPage() {
           Not you?
         </button>
       </p>
+
+      <EditDetails {...ctx} />
 
       {group.closed && (
         <p className="mb-4 rounded-2xl bg-accent-soft p-4">
@@ -235,10 +239,74 @@ function WrappedLink({ group }: { group: Group }) {
   )
 }
 
-/** Everyone in the group, with a way to add a friend who wasn't there when it was made. They
+/** Rename the group, or for a trip, change its dates. Collapsed behind a small link so it
+ * doesn't compete with the group's name for attention. */
+function EditDetails({ group, busy, act }: Ctx) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(group.name)
+  const [start, setStart] = useState(group.start_date ?? '')
+  const [end, setEnd] = useState(group.end_date ?? '')
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="-mt-3 mb-4 text-sm font-semibold underline">
+        Rename{group.kind === 'trip' ? ' or change dates' : ''}
+      </button>
+    )
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await act(() => setGroupDetails(group.id, trimmed, group.kind === 'trip' ? start || null : null, group.kind === 'trip' ? end || null : null))
+    setOpen(false)
+  }
+
+  return (
+    <form onSubmit={submit} className="-mt-1 mb-4 space-y-2 tile p-4">
+      <input
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        maxLength={60}
+        aria-label="Group name"
+        className="w-full rounded-lg bg-steel px-3 py-2 font-display text-lg font-semibold"
+      />
+      {group.kind === 'trip' && (
+        <div className="grid grid-cols-2 gap-2">
+          <input type="date" value={start} onChange={(event) => setStart(event.target.value)} aria-label="Start date" className="rounded-lg bg-steel px-3 py-2" />
+          <input
+            type="date"
+            value={end}
+            min={start || undefined}
+            onChange={(event) => setEnd(event.target.value)}
+            aria-label="End date"
+            className="rounded-lg bg-steel px-3 py-2"
+          />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={busy || !name.trim()}
+          className="flex-1 rounded-lg bg-brand py-2 font-display font-semibold text-white disabled:bg-muted/40"
+        >
+          Save
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="rounded-lg bg-steel px-4 py-2 font-semibold">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** Everyone in the group, with a way to add a friend who wasn't there when it was made, or take
+ * off someone added by mistake (only while they haven't paid or owed anything yet). Members
  * still need the link to actually use the group; this just gets them onto the member list. */
-function Members({ group, busy, act }: Ctx) {
+function Members({ group, you, busy, act }: Ctx) {
   const [name, setName] = useState('')
+  const [removing, setRemoving] = useState<string | null>(null)
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -248,13 +316,30 @@ function Members({ group, busy, act }: Ctx) {
     act(() => addMember(group.id, trimmed))
   }
 
+  function remove(person: string) {
+    if (removing !== person) return setRemoving(person)
+    setRemoving(null)
+    act(() => removeMember(group.id, person))
+  }
+
   return (
     <Section title="People in this group">
       <ul className="flex flex-wrap gap-2">
         {group.members.map((person) => (
-          <li key={person} className="flex items-center gap-2 rounded-full bg-steel py-1.5 pr-3 pl-1.5 text-sm font-semibold">
+          <li key={person} className="flex items-center gap-1.5 rounded-full bg-steel py-1.5 pr-1.5 pl-1.5 text-sm font-semibold">
             <Avatar name={person} color={personColor(group.members, person)} />
-            {person}
+            <span>{person}</span>
+            {person !== you && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => remove(person)}
+                aria-label={removing === person ? `Tap again to remove ${person}` : `Remove ${person}`}
+                className={`ml-0.5 rounded-full px-1.5 font-bold ${removing === person ? 'bg-chilli text-white' : 'text-muted'}`}
+              >
+                {removing === person ? 'Sure?' : '×'}
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -275,7 +360,9 @@ function Members({ group, busy, act }: Ctx) {
           Add
         </button>
       </form>
-      <p className="mt-2 text-sm text-muted">They’ll show up when you share the group’s link below.</p>
+      <p className="mt-2 text-sm text-muted">
+        New people show up once you share the group’s link below. Only someone with no activity yet can be removed.
+      </p>
     </Section>
   )
 }

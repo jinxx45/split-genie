@@ -99,6 +99,64 @@ def test_adding_a_member_needs_a_name(client):
     assert client.post(f"/api/groups/{group_id}/members", json={"name": "   "}).status_code == 422
 
 
+def test_a_member_with_no_activity_can_be_removed(client):
+    group_id = new_group(client).json()["id"]
+    client.post(f"/api/groups/{group_id}/members", json={"name": "Deepa"})
+
+    group = client.delete(f"/api/groups/{group_id}/members/Deepa").json()
+
+    assert group["members"] == MEMBERS
+
+
+def test_a_member_with_activity_cannot_be_removed(client):
+    group_id = new_group(client).json()["id"]
+    quick(client, group_id, 10000, paid_by="Arun")
+
+    response = client.delete(f"/api/groups/{group_id}/members/Arun")
+
+    assert response.status_code == 422
+    assert "already has activity" in response.json()["detail"]
+
+
+def test_a_group_cannot_be_shrunk_below_two_people(client):
+    group_id = new_group(client, members=["Priya", "Arun"], me="Priya").json()["id"]
+
+    response = client.delete(f"/api/groups/{group_id}/members/Arun")
+
+    assert response.status_code == 422
+    assert "at least 2 people" in response.json()["detail"]
+
+
+def test_renaming_a_group(client):
+    group_id = new_group(client).json()["id"]
+
+    group = client.put(f"/api/groups/{group_id}/details", json={"name": "  Office   gang  "}).json()
+
+    assert group["name"] == "Office gang"
+
+
+def test_a_trips_dates_can_be_changed(client):
+    group_id = new_group(client, kind="trip", start_date="2026-12-12", end_date="2026-12-15").json()["id"]
+
+    group = client.put(
+        f"/api/groups/{group_id}/details",
+        json={"name": "Goa 2026", "start_date": "2026-12-13", "end_date": "2026-12-16"},
+    ).json()
+
+    assert (group["start_date"], group["end_date"]) == ("2026-12-13", "2026-12-16")
+
+
+def test_a_trip_cannot_be_renamed_to_end_before_it_starts(client):
+    group_id = new_group(client, kind="trip", start_date="2026-12-12", end_date="2026-12-15").json()["id"]
+
+    response = client.put(
+        f"/api/groups/{group_id}/details",
+        json={"name": "Goa 2026", "start_date": "2026-12-15", "end_date": "2026-12-12"},
+    )
+
+    assert response.status_code == 422
+
+
 # --- The tab ---
 
 
