@@ -75,7 +75,7 @@ export function SettleTabs(ctx: GroupCtx) {
           )
         })}
       </ul>
-      {tab === 'get' && theyPay.length > 0 && !group.upi_ids[you] && <SaveUpiId {...ctx} />}
+      {tab === 'get' && (theyPay.length > 0 || group.upi_ids[you]) && <MyUpiId {...ctx} />}
     </section>
   )
 }
@@ -209,11 +209,38 @@ function reminder(group: Group, debt: Debt): string {
   ].join('\n')
 }
 
-/** Shown to someone who's owed money and hasn't given a UPI ID, so the others get a Pay button. */
-function SaveUpiId({ group, you, busy, act }: GroupCtx) {
+/** Your UPI ID in this group, so the others get a Pay button. Once saved it shows with
+ * "Change", which brings the box back with the saved ID in it. */
+function MyUpiId({ group, you, busy, act }: GroupCtx) {
+  const saved = group.upi_ids[you] ?? ''
+  // While changing: the ID that was saved when the box was opened. Saving a new one changes
+  // `saved`, so the box closes by itself; null means it's closed.
+  const [changing, setChanging] = useState<string | null>(null)
   const [upiId, setUpiId] = useState('')
+  const typed = upiId.trim()
+
+  if (saved && changing !== saved) {
+    return (
+      <p className="tile mt-3 flex items-center gap-3 px-4 py-3 text-sm">
+        <span className="min-w-0 flex-1">
+          <span className="block text-muted">They pay you at</span>
+          <span className="block truncate font-semibold">{saved}</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setUpiId(saved)
+            setChanging(saved)
+          }}
+          className="font-semibold underline"
+        >
+          Change
+        </button>
+      </p>
+    )
+  }
   return (
-    <div className="mt-3 tile p-4">
+    <div className="tile mt-3 p-4">
       <label className="block text-sm text-muted" htmlFor="my-upi">
         Your UPI ID, so they get a Pay button
       </label>
@@ -229,13 +256,18 @@ function SaveUpiId({ group, you, busy, act }: GroupCtx) {
         />
         <button
           type="button"
-          disabled={busy || !UPI_ID.test(upiId.trim())}
-          onClick={() => act(() => setGroupUpiId(group.id, you, upiId.trim()))}
+          disabled={busy || !UPI_ID.test(typed) || typed === saved}
+          onClick={() => act(() => setGroupUpiId(group.id, you, typed))}
           className="rounded-lg bg-brand px-4 font-display font-semibold text-white disabled:bg-muted/40"
         >
           Save
         </button>
       </div>
+      {saved && (
+        <button type="button" onClick={() => setChanging(null)} className="mt-2 text-sm font-semibold text-muted underline">
+          Keep {saved}
+        </button>
+      )}
     </div>
   )
 }
