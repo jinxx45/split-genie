@@ -21,7 +21,7 @@ import type { ActivityEntry, Group } from '../api'
 import { capitalise, dateRange, findEntry, groupLink, KIND_NAMES, nameOrYou, rememberedMember, rememberMember, whoPaysWhom } from '../groups'
 import type { GroupCtx } from '../groups'
 import { formatRupees, parseRupees } from '../money'
-import { upiLink } from '../upi'
+import { PayButton } from '../pay'
 import { personColor } from '../colors'
 import { Avatar, ErrorText, KindIcon, Screen, WhoAreYou } from '../ui'
 import { Chevron, SettleTabs, ShareSummary } from './GroupSettle'
@@ -489,14 +489,16 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
           {unpaid.map((owe) => {
             const upi = group.upi_ids[owe.receiver]
             return (
-              <div key={owe.receiver} className="mt-3 flex items-center gap-2">
+              <div key={owe.receiver} className="mt-3 flex flex-wrap items-center gap-2">
                 {upi && (
-                  <a
-                    href={upiLink(upi, owe.receiver, left(owe), `${group.name}: ${entry.title}`)}
+                  <PayButton
+                    upiId={upi}
+                    name={owe.receiver}
+                    paise={left(owe)}
+                    note={`${group.name}: ${entry.title}`}
+                    label={`Pay ${owe.receiver} ${formatRupees(left(owe))}`}
                     className="flex-1 rounded-xl bg-brand py-2.5 text-center font-display font-semibold text-white"
-                  >
-                    Pay {owe.receiver} {formatRupees(left(owe))}
-                  </a>
+                  />
                 )}
                 <button
                   type="button"

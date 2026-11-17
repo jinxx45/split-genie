@@ -9,7 +9,8 @@ import { personColor } from '../colors'
 import { findEntry, groupLink, whoPaysWhom } from '../groups'
 import type { GroupCtx } from '../groups'
 import { formatRupees } from '../money'
-import { UPI_ID, upiLink } from '../upi'
+import { PayButton } from '../pay'
+import { UPI_ID } from '../upi'
 import { Avatar } from '../ui'
 
 type Tab = 'pay' | 'get'
@@ -135,12 +136,14 @@ function DebtRow(
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {youOwe && otherUpi && (
-              <a
-                href={upiLink(otherUpi, other, debt.amount_paise, group.name)}
+              <PayButton
+                upiId={otherUpi}
+                name={other}
+                paise={debt.amount_paise}
+                note={group.name}
+                label={`Pay ${formatRupees(debt.amount_paise)}`}
                 className="flex-1 rounded-xl bg-brand py-3 text-center font-display font-semibold text-white"
-              >
-                Pay {formatRupees(debt.amount_paise)}
-              </a>
+              />
             )}
             {!youOwe && (
               <a

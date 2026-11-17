@@ -14,3 +14,17 @@ export function upiLink(upiId: string, name: string, paise: number, note = 'Spli
     .join('&')
   return `upi://pay?${query}`
 }
+
+/** The same payment as links that open one named app. UPI works across apps, so each takes the
+ * same details; only the start of the link differs. On Android the plain link already offers a
+ * list of UPI apps, but an iPhone has no such list, so these let the person choose. */
+export function upiAppLinks(upiId: string, name: string, paise: number, note?: string): { app: string; href: string }[] {
+  const plain = upiLink(upiId, name, paise, note)
+  const opening = (start: string) => plain.replace('upi://pay', start)
+  return [
+    { app: 'Google Pay', href: opening('tez://upi/pay') },
+    { app: 'PhonePe', href: opening('phonepe://pay') },
+    { app: 'Paytm', href: opening('paytmmp://pay') },
+    { app: 'Other UPI app', href: plain },
+  ]
+}

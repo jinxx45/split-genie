@@ -10,7 +10,8 @@ import { saveFriendUpiId, saveMyUpiId } from '../api'
 import type { Payment, PaymentMark, Split } from '../api'
 import { formatRupees } from '../money'
 import { ErrorText, Paper, Screen } from '../ui'
-import { UPI_ID, upiLink } from '../upi'
+import { PayButton } from '../pay'
+import { UPI_ID } from '../upi'
 import { useMe } from '../useMe'
 import { BreakdownList, BreakdownPaper, Payments } from './Summary'
 
@@ -159,15 +160,17 @@ function FriendView(props: Props & { friend: string; upiIds: Record<string, stri
       title={`${friend}’s share`}
       action={
         payable.length > 0 && (
-          <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
             {payable.map((payment) => (
-              <a
+              <PayButton
                 key={payment.receiver}
-                href={upiLink(upiIds[payment.receiver], payment.receiver, payment.amount_paise)}
-                className="block w-full rounded-2xl bg-brand px-5 py-4 text-center font-display text-lg font-semibold text-white active:scale-[0.98]"
-              >
-                Pay {payment.receiver} {formatRupees(payment.amount_paise)}
-              </a>
+                upiId={upiIds[payment.receiver]}
+                name={payment.receiver}
+                paise={payment.amount_paise}
+                note={name}
+                label={`Pay ${payment.receiver} ${formatRupees(payment.amount_paise)}`}
+                className="btn-pop w-full px-5 py-3.5 text-center text-lg"
+              />
             ))}
           </div>
         )
