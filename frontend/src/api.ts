@@ -286,6 +286,7 @@ export type Wrapped = {
 }
 export const getWrapped = (id: string) => request<Wrapped>(groupUrl(id, '/wrapped'))
 export const joinGroup = (id: string, member: string) => request<Group>(groupUrl(id, '/join'), json({ member }))
+export const addMember = (id: string, name: string) => request<Group>(groupUrl(id, '/members'), json({ name }))
 export const addQuickExpense = (
   id: string,
   expense: { title: string; amount_paise: number; paid_by: string; weights: Record<string, number>; added_by: string },

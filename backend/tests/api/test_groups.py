@@ -72,6 +72,33 @@ def test_anyone_with_the_link_can_see_the_group(client):
     assert client.get("/api/groups/nope").status_code == 404
 
 
+def test_a_member_can_be_added_after_the_group_is_created(client):
+    group_id = new_group(client).json()["id"]
+    client.post("/api/auth/sign-out")
+
+    group = client.post(f"/api/groups/{group_id}/members", json={"name": "Deepa"}).json()
+
+    assert group["members"] == [*MEMBERS, "Deepa"]
+    # They can now add an expense, like any other member.
+    expense = quick(client, group_id, 10000, paid_by="Deepa", weights={"Deepa": 1, "Priya": 1}, added_by="Deepa").json()
+    assert expense["balances"]["Deepa"] == 5000
+
+
+def test_adding_a_member_rejects_a_duplicate_name(client):
+    group_id = new_group(client).json()["id"]
+
+    response = client.post(f"/api/groups/{group_id}/members", json={"name": "arun"})  # case-insensitive
+
+    assert response.status_code == 422
+    assert "already in this group" in response.json()["detail"]
+
+
+def test_adding_a_member_needs_a_name(client):
+    group_id = new_group(client).json()["id"]
+
+    assert client.post(f"/api/groups/{group_id}/members", json={"name": "   "}).status_code == 422
+
+
 # --- The tab ---
 
 

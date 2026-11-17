@@ -26,6 +26,7 @@ from app.api.group_store import (
 )
 from app.api.schemas import (
     MAX_NAME_LENGTH,
+    MAX_PEOPLE,
     MAX_SPLIT_NAME_LENGTH,
     UPI_ID_PATTERN,
     clean_people,
@@ -73,6 +74,10 @@ class GroupIn(BaseModel):
 
 class JoinIn(BaseModel):
     member: Member
+
+
+class AddMemberIn(BaseModel):
+    name: Member
 
 
 class QuickExpenseIn(BaseModel):
@@ -165,6 +170,23 @@ def join_group(
     if user:
         groups.join(group_id, user.id, body.member)
     return describe_group(groups, group, user)
+
+
+@router.post("/{group_id}/members", status_code=201)
+def add_member(
+    group_id: str, body: AddMemberIn, user: User | None = Depends(current_user), groups: GroupStore = Depends(get_groups)
+) -> dict:
+    """Someone already in the group adds a friend who wasn't there at the start."""
+    group = load(groups, group_id)
+    name = " ".join(body.name.split())
+    if not name:
+        raise reject("Give them a name.")
+    if any(name.lower() == existing.lower() for existing in group.members):
+        raise reject(f"{name} is already in this group.")
+    if len(group.members) >= MAX_PEOPLE:
+        raise reject(f"A group can have at most {MAX_PEOPLE} people.")
+    groups.add_member(group_id, name)
+    return describe_group(groups, load(groups, group_id), user)
 
 
 @router.post("/{group_id}/expenses", status_code=201)

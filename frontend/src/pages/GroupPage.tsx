@@ -4,10 +4,11 @@
 // Anyone with the link can use it: they pick their name once (remembered on this phone).
 
 import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import {
   ApiError,
+  addMember,
   addRepayment,
   deleteExpense,
   deleteRepayment,
@@ -128,6 +129,7 @@ export function GroupPage() {
       {group.kind === 'flat' && <Months {...ctx} />}
       <Leaderboard {...ctx} />
       {group.kind === 'trip' && group.total_paise > 0 && <WrappedLink group={group} />}
+      <Members {...ctx} />
       <Invite group={group} />
       {group.kind === 'trip' && group.is_owner && <TripControls {...ctx} />}
       {error && <ErrorText>{error}</ErrorText>}
@@ -230,6 +232,51 @@ function WrappedLink({ group }: { group: Group }) {
         <span className="text-sm text-snow/75">{group.closed ? 'Your trip in one picture. Share it with the group.' : 'Your trip so far, in one picture.'}</span>
       </span>
     </Link>
+  )
+}
+
+/** Everyone in the group, with a way to add a friend who wasn't there when it was made. They
+ * still need the link to actually use the group; this just gets them onto the member list. */
+function Members({ group, busy, act }: Ctx) {
+  const [name, setName] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setName('')
+    act(() => addMember(group.id, trimmed))
+  }
+
+  return (
+    <Section title="People in this group">
+      <ul className="flex flex-wrap gap-2">
+        {group.members.map((person) => (
+          <li key={person} className="flex items-center gap-2 rounded-full bg-steel py-1.5 pr-3 pl-1.5 text-sm font-semibold">
+            <Avatar name={person} color={personColor(group.members, person)} />
+            {person}
+          </li>
+        ))}
+      </ul>
+      <form onSubmit={submit} className="mt-3 flex gap-2">
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Add a friend by name"
+          maxLength={40}
+          aria-label="Add a friend by name"
+          className="min-w-0 flex-1 rounded-lg bg-steel px-3 py-2"
+        />
+        <button
+          type="submit"
+          disabled={busy || !name.trim()}
+          className="rounded-lg bg-brand px-4 font-display font-semibold text-white disabled:bg-muted/40"
+        >
+          Add
+        </button>
+      </form>
+      <p className="mt-2 text-sm text-muted">They’ll show up when you share the group’s link below.</p>
+    </Section>
   )
 }
 
