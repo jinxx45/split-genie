@@ -154,12 +154,12 @@ function Cost({ group, you }: Ctx) {
 
   return (
     <div className="tile mt-3">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-4 text-left">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-3.5 text-left">
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">{group.kind === 'trip' ? 'The trip cost you' : 'Your share so far'}</span>
           <span className="text-sm text-muted">Everyone together {formatRupees(group.total_paise)}</span>
         </span>
-        <span className="amount text-xl font-bold">{formatRupees(group.spent[you] ?? 0)}</span>
+        <span className="amount shrink-0 text-xl font-bold whitespace-nowrap">{formatRupees(group.spent[you] ?? 0)}</span>
         <Chevron open={open} />
       </button>
       {open && (
@@ -195,7 +195,7 @@ function Leaderboard({ group, you }: Ctx) {
         {ranked.map((person, index) => {
           const spent = group.spent[person] ?? 0
           return (
-            <li key={person} className="py-3">
+            <li key={person} className="py-2.5">
               <div className="flex items-center gap-2.5">
                 <span className="amount w-4 text-center font-bold text-muted">{index + 1}</span>
                 <Avatar name={person} color={personColor(group.members, person)} />
@@ -203,7 +203,7 @@ function Leaderboard({ group, you }: Ctx) {
                   <span className="block truncate font-semibold">{person === you ? 'You' : person}</span>
                   <span className="block truncate text-sm text-muted">Paid {formatRupees(paid[person] ?? 0)}</span>
                 </span>
-                <span className="amount text-lg font-bold">{formatRupees(spent)}</span>
+                <span className="amount shrink-0 text-lg font-bold whitespace-nowrap">{formatRupees(spent)}</span>
               </div>
               <div className="mt-2 ml-8 h-2 rounded-full bg-steel" aria-hidden>
                 <div
@@ -264,7 +264,7 @@ function EditDetails({ group, busy, act }: Ctx) {
   }
 
   return (
-    <form onSubmit={submit} className="-mt-1 mb-4 space-y-2 tile p-4">
+    <form onSubmit={submit} className="-mt-1 mb-4 space-y-2 tile p-3.5">
       <input
         value={name}
         onChange={(event) => setName(event.target.value)}
@@ -326,7 +326,7 @@ function Members({ group, you, busy, act }: Ctx) {
     <Section title="People in this group">
       <ul className="flex flex-wrap gap-2">
         {group.members.map((person) => (
-          <li key={person} className="flex items-center gap-1.5 rounded-full bg-steel py-1.5 pr-1.5 pl-1.5 text-sm font-semibold">
+          <li key={person} className="flex items-center gap-1.5 rounded-full bg-steel py-1 pr-1.5 pl-1.5 text-sm font-semibold">
             <Avatar name={person} color={personColor(group.members, person)} />
             <span>{person}</span>
             {person !== you && (
@@ -429,7 +429,7 @@ function DueBills({ group, you, busy, act }: Ctx) {
           const key = `${due.recurring_id}-${due.month}`
           const paise = parseRupees(amounts[key] ?? '')
           return (
-            <li key={key} className="rounded-2xl bg-accent-soft p-4">
+            <li key={key} className="rounded-2xl bg-accent-soft p-3.5">
               <p className="font-semibold">
                 {due.title}, {due.label}
               </p>
@@ -470,9 +470,9 @@ function MonthlyBills({ group, busy, act, addLink }: Ctx & { addLink: string }) 
       )}
       <ul className="space-y-2">
         {group.recurring?.map((bill) => (
-          <li key={bill.id} className="flex items-center gap-3 tile p-4">
+          <li key={bill.id} className="flex items-center gap-3 tile p-3.5">
             <span className="min-w-0 flex-1">
-              <span className="block font-semibold">{bill.title}</span>
+              <span className="block truncate font-semibold">{bill.title}</span>
               <span className="text-sm text-muted">
                 {bill.amount_paise ? formatRupees(bill.amount_paise) : 'Changes monthly'}, {bill.paid_by} pays on the{' '}
                 {ordinal(bill.day_of_month)}
@@ -503,9 +503,9 @@ function Months({ group, you }: Ctx) {
     <Section title="By month">
       <ul className="divide-y divide-steel tile px-4">
         {group.months.map((month) => (
-          <li key={month.month} className="flex items-baseline justify-between py-3">
-            <span className="font-semibold">{month.label}</span>
-            <span className="text-right">
+          <li key={month.month} className="flex items-baseline justify-between gap-3 py-2.5">
+            <span className="min-w-0 truncate font-semibold">{month.label}</span>
+            <span className="shrink-0 text-right whitespace-nowrap">
               <span className="amount block">Your share {formatRupees(month.owed[you] ?? 0)}</span>
               <span className="text-sm text-muted">of {formatRupees(month.total_paise)}</span>
             </span>
@@ -556,7 +556,7 @@ function RepaymentLine(props: Ctx & { entry: Repayment; removing: boolean; onRem
   const { group, you, busy, entry } = props
   const paidFor = entry.expense_id ? findEntry(group, entry.expense_id) : undefined
   return (
-    <li className="flex items-center gap-3 tile-soft px-4 py-3 text-sm">
+    <li className="flex items-center gap-3 tile-soft px-3.5 py-2.5 text-sm">
       <span className="flex-1">
         <span className="font-semibold">{capitalise(nameOrYou(entry.sender, you))}</span> paid{' '}
         <span className="font-semibold">{nameOrYou(entry.receiver, you)}</span>{' '}
@@ -602,7 +602,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
 
   return (
     <li className="tile">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-4 text-left">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-3.5 text-left">
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{entry.title}</span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
@@ -623,7 +623,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
               ))}
           </span>
         </span>
-        <span className="amount text-lg font-semibold">{formatRupees(entry.total_paise)}</span>
+        <span className="amount shrink-0 text-lg font-semibold whitespace-nowrap">{formatRupees(entry.total_paise)}</span>
         <Chevron open={open} />
       </button>
 

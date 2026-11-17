@@ -45,7 +45,7 @@ export function SettleTabs(ctx: GroupCtx) {
                 setTab(option.id)
                 setOpen(null)
               }}
-              className={`rounded-[1.25rem] border-2 border-line p-3.5 text-left transition ${on ? 'bg-accent text-coal pop-shadow' : 'bg-white'}`}
+              className={`rounded-[1.25rem] border-2 border-line p-3 text-left transition ${on ? 'bg-accent text-coal pop-shadow' : 'bg-white'}`}
             >
               <span className={`block text-sm font-bold ${on ? '' : 'text-muted'}`}>{option.label}</span>
               <span className={`amount block text-2xl ${on ? 'font-extrabold' : 'font-bold'}`}>
@@ -109,16 +109,16 @@ function DebtRow(
         type="button"
         onClick={props.onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 p-4 text-left"
+        className="flex w-full items-center gap-3 p-3.5 text-left"
       >
         <Avatar name={other} color={personColor(group.members, other)} />
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold">{other}</span>
+          <span className="block truncate font-semibold">{other}</span>
           <span className="text-sm text-muted">
             {debt.entries.length} {debt.entries.length === 1 ? 'entry' : 'entries'}
           </span>
         </span>
-        <span className="amount text-xl font-bold">{formatRupees(debt.amount_paise)}</span>
+        <span className="amount shrink-0 text-xl font-bold whitespace-nowrap">{formatRupees(debt.amount_paise)}</span>
         <Chevron open={open} />
       </button>
 
@@ -128,9 +128,9 @@ function DebtRow(
             {debt.entries.map((entry) => (
               <EntryLine key={entry.ref} group={group} entryRef={entry.ref} amount={entry.amount_paise} />
             ))}
-            <li className="mt-1 flex justify-between border-t border-steel pt-2 font-semibold">
-              <span>{youOwe ? `You pay ${other}` : `${other} pays you`}</span>
-              <span className="amount">{formatRupees(debt.amount_paise)}</span>
+            <li className="mt-1 flex justify-between gap-3 border-t border-steel pt-2 font-semibold">
+              <span className="min-w-0 truncate">{youOwe ? `You pay ${other}` : `${other} pays you`}</span>
+              <span className="amount shrink-0 whitespace-nowrap">{formatRupees(debt.amount_paise)}</span>
             </li>
           </ul>
 
@@ -224,7 +224,7 @@ function MyUpiId({ group, you, busy, act }: GroupCtx) {
 
   if (saved && changing !== saved) {
     return (
-      <p className="tile mt-3 flex items-center gap-3 px-4 py-3 text-sm">
+      <p className="tile mt-3 flex items-center gap-3 px-3.5 py-2.5 text-sm">
         <span className="min-w-0 flex-1">
           <span className="block text-muted">They pay you at</span>
           <span className="block truncate font-semibold">{saved}</span>
@@ -243,7 +243,7 @@ function MyUpiId({ group, you, busy, act }: GroupCtx) {
     )
   }
   return (
-    <div className="tile mt-3 p-4">
+    <div className="tile mt-3 p-3.5">
       <label className="block text-sm text-muted" htmlFor="my-upi">
         Your UPI ID, so they get a Pay button
       </label>
