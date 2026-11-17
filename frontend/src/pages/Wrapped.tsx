@@ -109,7 +109,7 @@ export function WrappedPage() {
         ref={canvas}
         role="img"
         aria-label={summary}
-        className="w-full rounded-[1.25rem] border-2 border-line bg-coal"
+        className="w-full rounded-[0.625rem] border-2 border-line bg-coal"
         style={{ aspectRatio: `${CARD.width} / ${CARD.height}` }}
       />
       <div className="mt-4 flex items-center justify-between text-sm font-semibold">

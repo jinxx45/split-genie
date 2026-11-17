@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, sky blue and paper.
-   These are the "Pop" theme, the default: a paper page, white tiles with a black outline, and a
-   hard shadow on the main action. "Clean" and "Midnight" below override the same names, so
-   every screen follows the theme the person picks (see theme.ts). */
+   The bare values below are the "Pop" look: a paper page, white tiles with a black outline, and
+   a hard shadow on the main action. "Clean" (the default theme, see theme.ts) and "Midnight"
+   override the same names below, and theme.ts always sets data-theme before the first paint, so
+   which block is "bare" here never shows through — it's just where Pop's own values live. */
 @theme {
   --color-paper: #f6f4ee; /* the page */
   --color-white: #ffffff; /* cards and inputs, and text on brand-coloured buttons */
@@ -33,11 +34,11 @@
 :root {
   --shadow-pop: 4px 4px 0 var(--color-ink); /* the hard shadow, for the main action only */
   --tile-border: 2px;
-  --tile-radius: 1.25rem;
+  --tile-radius: 0.625rem; /* a slight rounding, not the pill/card look */
   --btn-bg: var(--color-accent);
   --btn-fg: var(--color-coal);
   --btn-border: 2px solid var(--color-ink);
-  --btn-radius: 1.125rem;
+  --btn-radius: 0.625rem;
 }
 
 /* Clean: white and airy, thin grey lines, black pill buttons. */
@@ -53,7 +54,6 @@
   --btn-bg: var(--color-brand);
   --btn-fg: #ffffff;
   --btn-border: 0 solid transparent;
-  --btn-radius: 999px;
 }
 
 /* Midnight: black page, dark cards, the accent as the light. White and brand swap roles, so a

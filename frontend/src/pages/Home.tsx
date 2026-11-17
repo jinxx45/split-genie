@@ -82,7 +82,7 @@ export function Home() {
 }
 
 /** The start tiles share this shape: outlined, and they press in when tapped. */
-const TILE = 'flex rounded-[1.25rem] border-2 border-line p-4 transition active:scale-[0.98]'
+const TILE = 'flex rounded-[0.625rem] border-2 border-line p-4 transition active:scale-[0.98]'
 
 const iconProps = {
   viewBox: '0 0 24 24',

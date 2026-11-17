@@ -27,7 +27,7 @@ export function SettleTabs(ctx: GroupCtx) {
 
   return (
     <section>
-      <div role="tablist" aria-label="Settle up" className="mr-1 grid grid-cols-2 gap-3">
+      <div role="tablist" aria-label="Settle up" className="mr-1 grid grid-cols-2 gap-2">
         {(
           [
             { id: 'pay', label: 'You pay', list: youPay },
@@ -45,10 +45,10 @@ export function SettleTabs(ctx: GroupCtx) {
                 setTab(option.id)
                 setOpen(null)
               }}
-              className={`rounded-[1.25rem] border-2 border-line p-3 text-left transition ${on ? 'bg-accent text-coal pop-shadow' : 'bg-white'}`}
+              className={`rounded-[0.625rem] border-2 border-line p-2.5 text-left transition ${on ? 'bg-accent text-coal pop-shadow' : 'bg-white'}`}
             >
               <span className={`block text-sm font-bold ${on ? '' : 'text-muted'}`}>{option.label}</span>
-              <span className={`amount block text-2xl ${on ? 'font-extrabold' : 'font-bold'}`}>
+              <span className={`amount block text-lg ${on ? 'font-extrabold' : 'font-bold'}`}>
                 {formatRupees(total(option.list))}
               </span>
             </button>
@@ -109,7 +109,7 @@ function DebtRow(
         type="button"
         onClick={props.onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 p-3.5 text-left"
+        className="flex w-full items-center gap-2 p-3 text-left"
       >
         <Avatar name={other} color={personColor(group.members, other)} />
         <span className="min-w-0 flex-1">
@@ -118,7 +118,7 @@ function DebtRow(
             {debt.entries.length} {debt.entries.length === 1 ? 'entry' : 'entries'}
           </span>
         </span>
-        <span className="amount shrink-0 text-xl font-bold whitespace-nowrap">{formatRupees(debt.amount_paise)}</span>
+        <span className="amount shrink-0 text-base font-bold whitespace-nowrap">{formatRupees(debt.amount_paise)}</span>
         <Chevron open={open} />
       </button>
 
@@ -128,7 +128,7 @@ function DebtRow(
             {debt.entries.map((entry) => (
               <EntryLine key={entry.ref} group={group} entryRef={entry.ref} amount={entry.amount_paise} />
             ))}
-            <li className="mt-1 flex justify-between gap-3 border-t border-steel pt-2 font-semibold">
+            <li className="mt-1 flex justify-between gap-2 border-t border-steel pt-2 font-semibold">
               <span className="min-w-0 truncate">{youOwe ? `You pay ${other}` : `${other} pays you`}</span>
               <span className="amount shrink-0 whitespace-nowrap">{formatRupees(debt.amount_paise)}</span>
             </li>
@@ -142,7 +142,7 @@ function DebtRow(
                 paise={debt.amount_paise}
                 note={group.name}
                 label={`Pay ${formatRupees(debt.amount_paise)}`}
-                className="flex-1 rounded-xl bg-brand py-3 text-center font-display font-semibold text-white"
+                className="flex-1 rounded-[0.625rem] bg-brand py-3 text-center font-display font-semibold text-white"
               />
             )}
             {!youOwe && (
@@ -150,7 +150,7 @@ function DebtRow(
                 href={`https://wa.me/?text=${encodeURIComponent(reminder(group, debt))}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 rounded-xl bg-brand py-3 text-center font-display font-semibold text-white"
+                className="flex-1 rounded-[0.625rem] bg-brand py-3 text-center font-display font-semibold text-white"
               >
                 Remind on WhatsApp
               </a>
@@ -159,7 +159,7 @@ function DebtRow(
               type="button"
               disabled={busy}
               onClick={record}
-              className="rounded-xl bg-steel px-4 py-3 font-display font-semibold"
+              className="rounded-[0.625rem] bg-steel px-4 py-3 font-display font-semibold"
             >
               {youOwe ? 'I’ve paid' : 'I got it'}
             </button>
@@ -181,7 +181,7 @@ function EntryLine(props: { group: Group; entryRef: string; amount: number }) {
   const entry = findEntry(props.group, props.entryRef)
   if (!entry) return null
   return (
-    <li className="flex justify-between gap-3 py-1">
+    <li className="flex justify-between gap-2 py-1">
       {entry.type === 'expense' ? (
         <span className="min-w-0 font-semibold">{entry.title}</span>
       ) : (
@@ -224,7 +224,7 @@ function MyUpiId({ group, you, busy, act }: GroupCtx) {
 
   if (saved && changing !== saved) {
     return (
-      <p className="tile mt-3 flex items-center gap-3 px-3.5 py-2.5 text-sm">
+      <p className="tile mt-3 flex items-center gap-2 px-3 py-2 text-sm">
         <span className="min-w-0 flex-1">
           <span className="block text-muted">They pay you at</span>
           <span className="block truncate font-semibold">{saved}</span>
@@ -243,7 +243,7 @@ function MyUpiId({ group, you, busy, act }: GroupCtx) {
     )
   }
   return (
-    <div className="tile mt-3 p-3.5">
+    <div className="tile mt-3 p-3">
       <label className="block text-sm text-muted" htmlFor="my-upi">
         Your UPI ID, so they get a Pay button
       </label>
@@ -281,8 +281,8 @@ export function ShareSummary({ group }: { group: Group }) {
   const text = person ? personSummary(group, person) : everyoneSummary(group)
 
   return (
-    <section className="mt-8">
-      <h2 className="mb-1 font-display text-xl font-semibold">Share who pays whom</h2>
+    <section>
+      <h2 className="mb-1 font-display text-lg font-semibold">Share who pays whom</h2>
       <p className="mb-3 text-sm text-muted">For everyone, or just one person’s own list.</p>
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Whose summary">
         {[null, ...group.members].map((option) => {
@@ -294,7 +294,7 @@ export function ShareSummary({ group }: { group: Group }) {
               role="radio"
               aria-checked={on}
               onClick={() => setPerson(option)}
-              className={`rounded-full border-2 px-3 py-1.5 text-sm font-semibold ${
+              className={`rounded-[0.625rem] border-2 px-3 py-1.5 text-sm font-semibold ${
                 on ? 'border-brand bg-brand text-white' : 'border-steel-dark bg-white text-muted'
               }`}
             >

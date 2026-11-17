@@ -37,6 +37,7 @@ export function GroupPage() {
   const [member, setMember] = useState<string | null>(() => rememberedMember(id))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<MainTab>('settle')
 
   useEffect(() => {
     getGroup(id)
@@ -98,16 +99,7 @@ export function GroupPage() {
           {group.kind === 'trip' && dates && `, ${dates}`}
         </>
       }
-      action={
-        !group.closed && (
-          <Link
-            to={addLink}
-            className="btn-pop block w-full px-5 py-3.5 text-center text-lg active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-          >
-            Add expense
-          </Link>
-        )
-      }
+      action={<BottomNav tab={tab} onChange={setTab} addLink={addLink} hideAdd={group.closed} />}
       headerRight={<AddPeopleButton {...ctx} />}
     >
       <p className="-mt-3 mb-4 text-sm text-muted">
@@ -120,69 +112,117 @@ export function GroupPage() {
       <EditDetails {...ctx} />
 
       {group.closed && (
-        <p className="mb-4 rounded-2xl bg-accent-soft p-4">
+        <p className="mb-4 rounded-[0.625rem] bg-accent-soft p-4">
           <span className="font-semibold">This trip has ended.</span> Settle up below; no new expenses can be added.
         </p>
       )}
 
-      <MainTabs {...ctx} addLink={addLink} />
+      <TabContent {...ctx} addLink={addLink} tab={tab} />
       <Members {...ctx} />
       <Invite group={group} />
       {group.kind === 'trip' && group.is_owner && <TripControls {...ctx} />}
       {error && <ErrorText>{error}</ErrorText>}
+      <div aria-hidden className="h-14" />
     </Screen>
   )
 }
 
 type Ctx = GroupCtx
+type MainTab = 'settle' | 'activity' | 'share'
 
-/** Everything else, in two top-level tabs: the money (settling up, cost, leaderboard) and the
- * activity log, which can get long and used to push the settle-up boxes far down the page. */
-function MainTabs(props: Ctx & { addLink: string }) {
-  const { group } = props
-  const [tab, setTab] = useState<'settle' | 'activity'>('settle')
-
-  return (
-    <section>
-      <div role="tablist" aria-label="Group sections" className="mb-4 flex gap-2">
-        {(
-          [
-            { id: 'settle', label: 'Settle up' },
-            { id: 'activity', label: 'Activity' },
-          ] as const
-        ).map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === option.id}
-            onClick={() => setTab(option.id)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              tab === option.id ? 'bg-ink text-paper' : 'bg-steel text-muted'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
+/** Everything else, switched by the bottom tab bar: the money (settling up, cost, leaderboard),
+ * the activity log (which can get long and used to push the settle-up boxes far down the page),
+ * and sharing who pays whom. */
+function TabContent(props: Ctx & { addLink: string; tab: MainTab }) {
+  const { group, tab } = props
+  if (tab === 'activity') {
+    return (
+      <div role="tabpanel">
+        <Activity {...props} />
       </div>
+    )
+  }
+  if (tab === 'share') {
+    return (
+      <div role="tabpanel">
+        <ShareSummary group={group} />
+      </div>
+    )
+  }
+  return (
+    <div role="tabpanel">
+      <SettleTabs {...props} />
+      <Cost {...props} />
+      {group.kind === 'flat' && <DueBills {...props} />}
+      {group.kind === 'flat' && <MonthlyBills {...props} addLink={`${props.addLink}?monthly`} />}
+      {group.kind === 'flat' && <Months {...props} />}
+      <Leaderboard {...props} />
+      {group.kind === 'trip' && group.total_paise > 0 && <WrappedLink group={group} />}
+    </div>
+  )
+}
 
-      {tab === 'settle' ? (
-        <div role="tabpanel">
-          <SettleTabs {...props} />
-          <Cost {...props} />
-          {group.kind === 'flat' && <DueBills {...props} />}
-          {group.debts.length > 0 && <ShareSummary group={group} />}
-          {group.kind === 'flat' && <MonthlyBills {...props} addLink={`${props.addLink}?monthly`} />}
-          {group.kind === 'flat' && <Months {...props} />}
-          <Leaderboard {...props} />
-          {group.kind === 'trip' && group.total_paise > 0 && <WrappedLink group={group} />}
-        </div>
-      ) : (
-        <div role="tabpanel">
-          <Activity {...props} />
-        </div>
+const NAV_TABS: { id: MainTab; label: string }[] = [
+  { id: 'settle', label: 'Settle up' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'share', label: 'Share' },
+]
+
+/** The bottom sticky bar: "Add expense" above three tabs (Settle up, Activity, Share), both
+ * pinned to the screen's bottom edge the way a native app's tab bar and FAB sit together. */
+function BottomNav({ tab, onChange, addLink, hideAdd }: { tab: MainTab; onChange: (tab: MainTab) => void; addLink: string; hideAdd: boolean }) {
+  return (
+    <div className="space-y-2">
+      {!hideAdd && (
+        <Link
+          to={addLink}
+          className="btn-pop block w-full px-5 py-3 text-center active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+        >
+          Add expense
+        </Link>
       )}
-    </section>
+      <div role="tablist" aria-label="Group sections" className="tile grid grid-cols-3 bg-white">
+        {NAV_TABS.map((option) => {
+          const on = tab === option.id
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onChange(option.id)}
+              className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${on ? 'text-ink' : 'text-muted'}`}
+            >
+              <NavIcon id={option.id} active={on} />
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const NAV_ICON_PATHS: Record<MainTab, string> = {
+  settle: 'M7 7h11l-3-3m3 3-3 3M17 17H6l3 3m-3-3 3-3',
+  activity: 'M6 4h12v16l-2-1.5L14 20l-2-1.5L10 20l-2-1.5L6 20V4Zm3 5h6m-6 4h6',
+  share: 'M4 12 20 4l-4 16-4-7-7-1Z',
+}
+
+function NavIcon({ id, active }: { id: MainTab; active: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={active ? 2.2 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={NAV_ICON_PATHS[id]} />
+    </svg>
   )
 }
 
@@ -197,17 +237,17 @@ function AddPeopleButton({ group, busy, act }: Ctx) {
     if (!trimmed) return
     setName('')
     act(() => addMember(group.id, trimmed))
+    setOpen(false)
   }
 
   return (
-    <div className="relative">
+    <>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
+        onClick={() => setOpen(true)}
         aria-label="Add people"
         title="Add people"
-        className={`flex size-9 items-center justify-center rounded-full border-2 border-line ${open ? 'bg-accent' : 'bg-white'}`}
+        className="flex size-9 items-center justify-center rounded-full border-2 border-line bg-white"
       >
         <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <circle cx="9" cy="8" r="3" />
@@ -215,26 +255,38 @@ function AddPeopleButton({ group, busy, act }: Ctx) {
         </svg>
       </button>
       {open && (
-        <form onSubmit={submit} className="tile pop-shadow absolute top-11 right-0 z-10 flex w-60 gap-1.5 bg-white p-2.5">
-          <input
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Friend's name"
-            maxLength={40}
-            aria-label="Add a friend by name"
-            className="min-w-0 flex-1 rounded-lg bg-steel px-2.5 py-1.5 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={busy || !name.trim()}
-            className="rounded-lg bg-brand px-3 font-display text-sm font-semibold text-white disabled:bg-muted/40"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setOpen(false)}>
+          <form
+            onSubmit={submit}
+            onClick={(event) => event.stopPropagation()}
+            className="tile pop-shadow w-full max-w-xs space-y-3 bg-white p-4"
           >
-            Add
-          </button>
-        </form>
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-semibold">Add people</h2>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="px-1 text-muted">
+                ✕
+              </button>
+            </div>
+            <input
+              autoFocus
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Friend's name"
+              maxLength={40}
+              aria-label="Add a friend by name"
+              className="w-full rounded-lg bg-steel px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={busy || !name.trim()}
+              className="w-full rounded-lg bg-brand py-2 font-display text-sm font-semibold text-white disabled:bg-muted/40"
+            >
+              Add
+            </button>
+          </form>
+        </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -249,18 +301,18 @@ function Cost({ group, you }: Ctx) {
 
   return (
     <div className="tile mt-3">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-3.5 text-left">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-2 p-3 text-left">
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">{group.kind === 'trip' ? 'The trip cost you' : 'Your share so far'}</span>
           <span className="text-sm text-muted">Everyone together {formatRupees(group.total_paise)}</span>
         </span>
-        <span className="amount shrink-0 text-xl font-bold whitespace-nowrap">{formatRupees(group.spent[you] ?? 0)}</span>
+        <span className="amount shrink-0 text-lg font-bold whitespace-nowrap">{formatRupees(group.spent[you] ?? 0)}</span>
         <Chevron open={open} />
       </button>
       {open && (
         <ul className="px-4 pb-4 text-sm">
           {mine.map((item, index) => (
-            <li key={item.id} className={`flex justify-between gap-3 py-1 ${index === 0 ? 'border-t border-dashed border-steel-dark pt-2' : ''}`}>
+            <li key={item.id} className={`flex justify-between gap-2 py-1 ${index === 0 ? 'border-t border-dashed border-steel-dark pt-2' : ''}`}>
               <span className="min-w-0 truncate">{item.title}</span>
               <span className="amount shrink-0">{formatRupees(item.part)}</span>
             </li>
@@ -290,15 +342,15 @@ function Leaderboard({ group, you }: Ctx) {
         {ranked.map((person, index) => {
           const spent = group.spent[person] ?? 0
           return (
-            <li key={person} className="py-2.5">
-              <div className="flex items-center gap-2.5">
+            <li key={person} className="py-2">
+              <div className="flex items-center gap-2">
                 <span className="amount w-4 text-center font-bold text-muted">{index + 1}</span>
                 <Avatar name={person} color={personColor(group.members, person)} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{person === you ? 'You' : person}</span>
                   <span className="block truncate text-sm text-muted">Paid {formatRupees(paid[person] ?? 0)}</span>
                 </span>
-                <span className="amount shrink-0 text-lg font-bold whitespace-nowrap">{formatRupees(spent)}</span>
+                <span className="amount shrink-0 text-base font-bold whitespace-nowrap">{formatRupees(spent)}</span>
               </div>
               <div className="mt-2 ml-8 h-2 rounded-full bg-steel" aria-hidden>
                 <div
@@ -319,9 +371,9 @@ function WrappedLink({ group }: { group: Group }) {
   return (
     <Link
       to={`/groups/${group.id}/wrapped`}
-      className="mt-6 mr-1 flex items-center gap-4 rounded-[1.25rem] border-2 border-line bg-coal p-4 text-snow pop-shadow"
+      className="mt-6 mr-1 flex items-center gap-4 rounded-[0.625rem] border-2 border-line bg-coal p-4 text-snow pop-shadow"
     >
-      <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-coal">
+      <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-[0.625rem] bg-accent text-coal">
         <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 3l2.2 5.6L20 9.3l-4.5 3.9L17 19l-5-3.1L7 19l1.5-5.8L4 9.3l5.8-.7Z" />
         </svg>
@@ -421,7 +473,7 @@ function Members({ group, you, busy, act }: Ctx) {
     <Section title="People in this group">
       <ul className="flex flex-wrap gap-2">
         {group.members.map((person) => (
-          <li key={person} className="flex items-center gap-1.5 rounded-full bg-steel py-1 pr-1.5 pl-1.5 text-sm font-semibold">
+          <li key={person} className="flex items-center gap-1.5 rounded-[0.625rem] bg-steel py-1 pr-1.5 pl-1.5 text-sm font-semibold">
             <Avatar name={person} color={personColor(group.members, person)} />
             <span>{person}</span>
             {person !== you && (
@@ -430,7 +482,7 @@ function Members({ group, you, busy, act }: Ctx) {
                 disabled={busy}
                 onClick={() => remove(person)}
                 aria-label={removing === person ? `Tap again to remove ${person}` : `Remove ${person}`}
-                className={`ml-0.5 rounded-full px-1.5 font-bold ${removing === person ? 'bg-chilli text-white' : 'text-muted'}`}
+                className={`ml-0.5 rounded-[0.625rem] px-1.5 font-bold ${removing === person ? 'bg-chilli text-white' : 'text-muted'}`}
               >
                 {removing === person ? 'Sure?' : '×'}
               </button>
@@ -506,7 +558,7 @@ function TripControls({ group, busy, act }: Ctx) {
       type="button"
       disabled={busy}
       onClick={() => (confirming ? act(() => setGroupClosed(group.id, true)) : setConfirming(true))}
-      className={`mt-3 w-full py-3 font-display font-semibold ${confirming ? 'rounded-[1.25rem] bg-chilli text-white' : 'tile'}`}
+      className={`mt-3 w-full py-3 font-display font-semibold ${confirming ? 'rounded-[0.625rem] bg-chilli text-white' : 'tile'}`}
     >
       {confirming ? 'Tap again to end the trip' : 'End trip and settle up'}
     </button>
@@ -524,7 +576,7 @@ function DueBills({ group, you, busy, act }: Ctx) {
           const key = `${due.recurring_id}-${due.month}`
           const paise = parseRupees(amounts[key] ?? '')
           return (
-            <li key={key} className="rounded-2xl bg-accent-soft p-3.5">
+            <li key={key} className="rounded-[0.625rem] bg-accent-soft p-3">
               <p className="font-semibold">
                 {due.title}, {due.label}
               </p>
@@ -565,7 +617,7 @@ function MonthlyBills({ group, busy, act, addLink }: Ctx & { addLink: string }) 
       )}
       <ul className="space-y-2">
         {group.recurring?.map((bill) => (
-          <li key={bill.id} className="flex items-center gap-3 tile p-3.5">
+          <li key={bill.id} className="flex items-center gap-2 tile p-3">
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold">{bill.title}</span>
               <span className="text-sm text-muted">
@@ -598,7 +650,7 @@ function Months({ group, you }: Ctx) {
     <Section title="By month">
       <ul className="divide-y divide-steel tile px-4">
         {group.months.map((month) => (
-          <li key={month.month} className="flex items-baseline justify-between gap-3 py-2.5">
+          <li key={month.month} className="flex items-baseline justify-between gap-2 py-2">
             <span className="min-w-0 truncate font-semibold">{month.label}</span>
             <span className="shrink-0 text-right whitespace-nowrap">
               <span className="amount block">Your share {formatRupees(month.owed[you] ?? 0)}</span>
@@ -651,7 +703,7 @@ function RepaymentLine(props: Ctx & { entry: Repayment; removing: boolean; onRem
   const { group, you, busy, entry } = props
   const paidFor = entry.expense_id ? findEntry(group, entry.expense_id) : undefined
   return (
-    <li className="flex items-center gap-3 tile-soft px-3.5 py-2.5 text-sm">
+    <li className="flex items-center gap-2 tile-soft px-3 py-2 text-sm">
       <span className="flex-1">
         <span className="font-semibold">{capitalise(nameOrYou(entry.sender, you))}</span> paid{' '}
         <span className="font-semibold">{nameOrYou(entry.receiver, you)}</span>{' '}
@@ -697,7 +749,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
 
   return (
     <li className="tile">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-3.5 text-left">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-2 p-3 text-left">
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{entry.title}</span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
@@ -710,15 +762,15 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
               .join(', ')}
             {yours.length > 0 &&
               (unpaid.length ? (
-                <span className="rounded-full bg-accent-soft px-2 font-semibold text-accent-deep">
+                <span className="rounded-[0.625rem] bg-accent-soft px-2 font-semibold text-accent-deep">
                   you owe {formatRupees(unpaid.reduce((sum, owe) => sum + left(owe), 0))}
                 </span>
               ) : (
-                <span className="rounded-full bg-good-soft px-2 font-semibold text-good">settled</span>
+                <span className="rounded-[0.625rem] bg-good-soft px-2 font-semibold text-good">settled</span>
               ))}
           </span>
         </span>
-        <span className="amount shrink-0 text-lg font-semibold whitespace-nowrap">{formatRupees(entry.total_paise)}</span>
+        <span className="amount shrink-0 text-base font-semibold whitespace-nowrap">{formatRupees(entry.total_paise)}</span>
         <Chevron open={open} />
       </button>
 
@@ -747,7 +799,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
                     paise={left(owe)}
                     note={`${group.name}: ${entry.title}`}
                     label={`Pay ${owe.receiver} ${formatRupees(left(owe))}`}
-                    className="flex-1 rounded-xl bg-brand py-2.5 text-center font-display font-semibold text-white"
+                    className="flex-1 rounded-[0.625rem] bg-brand py-2.5 text-center font-display font-semibold text-white"
                   />
                 )}
                 <button
@@ -758,7 +810,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
                       addRepayment(group.id, { sender: you, receiver: owe.receiver, amount_paise: left(owe), by: you, expense_id: entry.id }),
                     )
                   }
-                  className={`rounded-xl bg-steel px-3 py-2.5 font-display font-semibold ${upi ? '' : 'flex-1'}`}
+                  className={`rounded-[0.625rem] bg-steel px-3 py-2.5 font-display font-semibold ${upi ? '' : 'flex-1'}`}
                 >
                   {upi ? 'I’ve paid' : `I’ve paid ${owe.receiver} ${formatRupees(left(owe))}`}
                 </button>
@@ -766,7 +818,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
             )
           })}
 
-          <p className="mt-3 flex items-center gap-3 text-muted">
+          <p className="mt-3 flex items-center gap-2 text-muted">
             <span className="flex-1">
               {entry.source === 'recurring' ? 'Monthly bill' : entry.added_by ? `Added by ${entry.added_by}` : ''}
               {entry.split_id && (
@@ -845,8 +897,8 @@ function AskAbout({ group, you, entry }: { group: Group; you: string; entry: Exp
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mt-8">
-      <h2 className="mb-3 font-display text-xl font-semibold">{title}</h2>
+    <section className="mt-6">
+      <h2 className="mb-2 font-display text-lg font-semibold">{title}</h2>
       {children}
     </section>
   )

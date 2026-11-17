@@ -1,20 +1,20 @@
-// The app's look: Pop (default), Clean or Midnight. A theme is a set of CSS variables in
+// The app's look: Clean (default), Midnight or Pop. A theme is a set of CSS variables in
 // index.css, switched by a data-theme attribute on <html> and remembered on this phone.
 
-export const THEMES = ['pop', 'clean', 'midnight'] as const
+export const THEMES = ['clean', 'midnight', 'pop'] as const
 export type Theme = (typeof THEMES)[number]
 
-export const THEME_NAMES: Record<Theme, string> = { pop: 'Pop', clean: 'Clean', midnight: 'Midnight' }
+export const THEME_NAMES: Record<Theme, string> = { clean: 'Clean', midnight: 'Midnight', pop: 'Pop' }
 
 const KEY = 'split-rupya:theme'
 
-/** The theme chosen earlier on this phone. Storage can be blocked (private mode): then Pop. */
+/** The theme chosen earlier on this phone. Storage can be blocked (private mode): then Clean. */
 export function savedTheme(): Theme {
   try {
     const saved = localStorage.getItem(KEY)
-    return THEMES.find((theme) => theme === saved) ?? 'pop'
+    return THEMES.find((theme) => theme === saved) ?? 'clean'
   } catch {
-    return 'pop'
+    return 'clean'
   }
 }
 
