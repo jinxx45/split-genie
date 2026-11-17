@@ -79,7 +79,7 @@ export function InstantSplit() {
             maxLength={60}
             aria-label="What it was for"
             enterKeyHint="next"
-            className="min-w-0 rounded-2xl bg-white px-4 py-3"
+            className="min-w-0 tile px-4 py-3"
           />
           <input
             value={amount}
@@ -87,7 +87,7 @@ export function InstantSplit() {
             inputMode="decimal"
             placeholder="₹ 0"
             aria-label="Amount in rupees"
-            className="amount min-w-0 rounded-2xl bg-white px-4 py-3 text-right"
+            className="amount min-w-0 tile px-4 py-3 text-right"
           />
         </div>
 

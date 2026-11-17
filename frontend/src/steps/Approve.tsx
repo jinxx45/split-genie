@@ -54,7 +54,7 @@ export function Approve({ question, people, answer, busy, error }: Props) {
             maxLength={500}
             rows={2}
             autoFocus
-            className="mt-2 w-full resize-none rounded-2xl bg-white px-4 py-3"
+            className="mt-2 w-full resize-none tile px-4 py-3"
           />
         </label>
       )}

@@ -26,7 +26,7 @@ export function SettleTabs(ctx: GroupCtx) {
 
   return (
     <section>
-      <div role="tablist" aria-label="Settle up" className="grid grid-cols-2 gap-2">
+      <div role="tablist" aria-label="Settle up" className="mr-1 grid grid-cols-2 gap-3">
         {(
           [
             { id: 'pay', label: 'You pay', list: youPay },
@@ -44,10 +44,10 @@ export function SettleTabs(ctx: GroupCtx) {
                 setTab(option.id)
                 setOpen(null)
               }}
-              className={`rounded-2xl p-4 text-left transition ${on ? 'bg-brand text-paper' : 'bg-white text-ink'}`}
+              className={`rounded-[1.25rem] border-2 border-ink p-3.5 text-left transition ${on ? 'bg-saffron shadow-pop' : 'bg-white'}`}
             >
-              <span className={`block text-sm font-semibold ${on ? 'text-paper/80' : 'text-muted'}`}>{option.label}</span>
-              <span className={`amount block text-2xl font-bold ${on && option.id === 'get' ? 'text-saffron' : ''}`}>
+              <span className={`block text-sm font-bold ${on ? '' : 'text-muted'}`}>{option.label}</span>
+              <span className={`amount block text-2xl ${on ? 'font-extrabold' : 'font-bold'}`}>
                 {formatRupees(total(option.list))}
               </span>
             </button>
@@ -57,7 +57,7 @@ export function SettleTabs(ctx: GroupCtx) {
 
       <ul role="tabpanel" className="mt-3 space-y-2">
         {debts.length === 0 && (
-          <li className="rounded-2xl bg-white/60 p-4 text-center text-muted">
+          <li className="tile-soft p-4 text-center text-muted">
             {tab === 'pay' ? 'You don’t owe anyone here.' : 'Nobody owes you here.'}
           </li>
         )}
@@ -103,7 +103,7 @@ function DebtRow(
     )
 
   return (
-    <li className="rounded-2xl bg-white">
+    <li className="tile">
       <button
         type="button"
         onClick={props.onToggle}
@@ -114,7 +114,7 @@ function DebtRow(
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">{other}</span>
           <span className="text-sm text-muted">
-            {debt.entries.length} {debt.entries.length === 1 ? 'entry' : 'entries'}, tap to see
+            {debt.entries.length} {debt.entries.length === 1 ? 'entry' : 'entries'}
           </span>
         </span>
         <span className="amount text-xl font-bold">{formatRupees(debt.amount_paise)}</span>
@@ -213,7 +213,7 @@ function reminder(group: Group, debt: Debt): string {
 function SaveUpiId({ group, you, busy, act }: GroupCtx) {
   const [upiId, setUpiId] = useState('')
   return (
-    <div className="mt-3 rounded-2xl bg-white p-4">
+    <div className="mt-3 tile p-4">
       <label className="block text-sm text-muted" htmlFor="my-upi">
         Your UPI ID, so they get a Pay button
       </label>
@@ -268,12 +268,12 @@ export function ShareSummary({ group }: { group: Group }) {
           )
         })}
       </div>
-      <pre className="mt-3 rounded-2xl bg-white p-4 font-body text-sm whitespace-pre-wrap">{text}</pre>
+      <pre className="mt-3 tile p-4 font-body text-sm whitespace-pre-wrap">{text}</pre>
       <a
         href={`https://wa.me/?text=${encodeURIComponent(text)}`}
         target="_blank"
         rel="noreferrer"
-        className="mt-2 block rounded-2xl bg-white px-4 py-3 text-center font-display font-semibold ring-2 ring-brand"
+        className="mt-2 block tile px-4 py-3 text-center font-display font-semibold ring-2 ring-brand"
       >
         Send on WhatsApp
       </a>
@@ -307,7 +307,7 @@ export function Chevron({ open }: { open: boolean }) {
   return (
     <span
       aria-hidden
-      className={`flex size-8 shrink-0 items-center justify-center rounded-full bg-steel transition-transform ${open ? 'rotate-180' : ''}`}
+      className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] border-2 border-ink transition-transform ${open ? 'rotate-180 bg-ink text-paper' : ''}`}
     >
       <svg
         viewBox="0 0 24 24"

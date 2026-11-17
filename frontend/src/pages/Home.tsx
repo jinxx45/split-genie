@@ -1,8 +1,7 @@
-// The home screen: two ways to split, then (signed in) your splits and your groups, or (signed
-// out) a sign-in box. The photo button opens the phone's camera or gallery, then the scan page
-// (/scan) with the photos attached. Instant split is at /instant.
+// The home screen: three start tiles (photo of the bill, instant split, new group), then, signed
+// in, your splits and your groups, or, signed out, a sign-in box. The photo tile opens the
+// phone's camera or gallery, then the scan page (/scan) with the photos attached.
 
-import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { MAX_PHOTOS } from '../api'
 import { History, MyGroups, SignedInBar, SignInBox } from './Account'
@@ -25,16 +24,17 @@ export function Home() {
     <Screen title={user ? `Hi, ${user.name.split(' ')[0]}` : 'Split a bill'}>
       <SignedInBar me={me} setMe={setMe} />
 
-      <div className={`space-y-3 ${user ? 'mt-4' : ''}`}>
+      <div className={`mr-1 grid grid-cols-2 gap-3 ${user ? 'mt-4' : ''}`}>
         {/* A label around a hidden file input: tapping it opens the phone's own "Camera or Gallery"
             chooser, with no extra screen first. */}
-        <label className={`${START} cursor-pointer bg-brand text-paper`}>
-          <StartText
-            title="Take a photo of the bill"
-            about="We read every item and work out who had what."
-            icon={<CameraIcon />}
-            dark
-          />
+        <label className={`${TILE} col-span-2 cursor-pointer items-center gap-4 bg-saffron shadow-pop`}>
+          <span aria-hidden className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-ink text-saffron">
+            <CameraIcon />
+          </span>
+          <span>
+            <span className="block font-display text-[1.35rem] leading-tight font-extrabold">Snap the bill</span>
+            <span className="text-sm">Take a photo. We work out who had what.</span>
+          </span>
           <input
             type="file"
             accept="image/*"
@@ -43,8 +43,15 @@ export function Home() {
             onChange={(event) => scanPhotos(event.target.files)}
           />
         </label>
-        <Link to="/instant" className={`${START} border-2 border-brand bg-white`}>
-          <StartText title="Instant split" about="Just the amount. Split in seconds." icon={<BoltIcon />} />
+        <Link to="/instant" className={`${TILE} min-h-26 flex-col justify-between bg-ink text-paper`}>
+          <span aria-hidden className="text-saffron">
+            <BoltIcon />
+          </span>
+          <span className="font-display text-lg font-bold">Instant split</span>
+        </Link>
+        <Link to="/groups/new" className={`${TILE} min-h-26 flex-col justify-between bg-white`}>
+          <GroupIcon />
+          <span className="font-display text-lg font-bold">New group</span>
         </Link>
       </div>
 
@@ -74,28 +81,8 @@ export function Home() {
   )
 }
 
-/** The two big ways to start share this shape. */
-const START = 'flex items-center gap-4 rounded-2xl p-4 transition active:scale-[0.98]'
-
-/** What's inside a start button. `dark` is the main one: black, like the app's main buttons. */
-function StartText(props: { title: string; about: string; icon: ReactNode; dark?: boolean }) {
-  return (
-    <>
-      <span
-        aria-hidden
-        className={`flex size-12 shrink-0 items-center justify-center rounded-full ${
-          props.dark ? 'bg-saffron text-brand' : 'bg-saffron-soft'
-        }`}
-      >
-        {props.icon}
-      </span>
-      <span>
-        <span className="block font-display text-xl font-semibold">{props.title}</span>
-        <span className={`text-sm ${props.dark ? 'text-paper/75' : 'text-muted'}`}>{props.about}</span>
-      </span>
-    </>
-  )
-}
+/** The start tiles share this shape: outlined, and they press in when tapped. */
+const TILE = 'flex rounded-[1.25rem] border-2 border-ink p-4 transition active:scale-[0.98]'
 
 const iconProps = {
   viewBox: '0 0 24 24',
@@ -112,6 +99,15 @@ function CameraIcon() {
     <svg {...iconProps}>
       <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
       <circle cx="12" cy="13.5" r="3.5" />
+    </svg>
+  )
+}
+
+function GroupIcon() {
+  return (
+    <svg {...iconProps} aria-hidden>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" />
     </svg>
   )
 }

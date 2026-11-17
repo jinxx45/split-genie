@@ -14,12 +14,12 @@ export function Payments(props: {
 }) {
   const { payments, people, action } = props
   if (payments.length === 0) {
-    return <p className="rounded-2xl bg-white p-4">Everyone is already square. Nobody needs to pay.</p>
+    return <p className="tile p-4">Everyone is already square. Nobody needs to pay.</p>
   }
   return (
     <ul className="space-y-2">
       {payments.map((payment) => (
-        <li key={`${payment.sender}-${payment.receiver}`} className="rounded-2xl bg-white p-4">
+        <li key={`${payment.sender}-${payment.receiver}`} className="tile p-4">
           <div className="flex items-center gap-3">
             <Avatar name={payment.sender} color={personColor(people, payment.sender)} />
             <span className="flex-1 leading-snug">
@@ -41,7 +41,7 @@ export function BreakdownList({ breakdown, people }: { breakdown: Record<string,
   return (
     <div className="space-y-2">
       {Object.entries(breakdown).map(([person, part]) => (
-        <details key={person} className="group rounded-2xl bg-white">
+        <details key={person} className="group tile">
           <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
             <Avatar name={person} color={personColor(people, person)} />
             <span className="flex-1 font-semibold">{person}</span>

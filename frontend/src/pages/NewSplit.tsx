@@ -118,7 +118,7 @@ export function NewSplit() {
             maxLength={60}
             required
             enterKeyHint="next"
-            className="mt-2 w-full rounded-2xl bg-white px-4 py-3"
+            className="mt-2 w-full tile px-4 py-3"
           />
         </label>
 
@@ -138,7 +138,7 @@ export function NewSplit() {
             placeholder="Ravi doesn’t drink. Meena left before dessert."
             maxLength={500}
             rows={2}
-            className="mt-2 w-full resize-none rounded-2xl bg-white px-4 py-3"
+            className="mt-2 w-full resize-none tile px-4 py-3"
           />
         </label>
 

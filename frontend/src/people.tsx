@@ -35,7 +35,7 @@ export function PeoplePicker(props: { people: string[]; onChange: (people: strin
             type="button"
             onClick={() => onChange(people.filter((p) => p !== person))}
             aria-label={`Remove ${person}`}
-            className="flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 font-semibold"
+            className="flex items-center gap-2 rounded-2xl border-2 border-ink bg-white py-1 pr-3 pl-1 font-semibold"
           >
             <Avatar name={person} color={personColor(people, person)} />
             {person}
@@ -57,13 +57,13 @@ export function PeoplePicker(props: { people: string[]; onChange: (people: strin
           placeholder={people.length ? 'Add another name' : 'Add a name'}
           maxLength={40}
           enterKeyHint="done"
-          className="min-w-0 flex-1 rounded-2xl bg-white px-4 py-3"
+          className="min-w-0 flex-1 tile px-4 py-3"
         />
         <button
           type="button"
           onClick={() => add()}
           disabled={!name.trim()}
-          className="rounded-2xl bg-white px-5 font-display font-semibold text-brand disabled:text-muted/50"
+          className="tile px-5 font-display font-semibold text-brand disabled:text-muted/50"
         >
           Add
         </button>
@@ -152,16 +152,16 @@ export function ShareSteppers(props: {
 }) {
   const total = Object.values(props.weights).reduce((sum, weight) => sum + weight, 0)
   return (
-    <ul className="mt-3 divide-y divide-steel rounded-2xl bg-white px-4">
+    <ul className="mt-3 divide-y divide-steel tile px-4">
       {props.people.map((person) => {
         const weight = props.weights[person]
         return (
-          <li key={person} className="flex items-center gap-3 py-2">
+          <li key={person} className="flex items-center gap-2 py-2">
             <span className="size-2.5 rounded-full" style={{ background: personColor(props.members, person) }} aria-hidden />
             <span className="flex-1">
               {person}
               {props.paise ? (
-                <span className="block text-sm text-muted">about {formatRupees(Math.round((props.paise * weight) / total))}</span>
+                <span className="block text-sm whitespace-nowrap text-muted">about {formatRupees(Math.round((props.paise * weight) / total))}</span>
               ) : null}
             </span>
             <button
@@ -173,7 +173,7 @@ export function ShareSteppers(props: {
             >
               −
             </button>
-            <span className="amount w-18 text-center whitespace-nowrap">
+            <span className="amount w-16 text-center text-sm whitespace-nowrap">
               {weight} share{weight > 1 ? 's' : ''}
             </span>
             <button

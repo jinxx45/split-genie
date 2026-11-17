@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
-/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, saffron, paper, on a steel-grey page. */
+/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, saffron and paper. The look is
+   "Pop": a paper page, white tiles with a black outline, and a hard shadow on the main action. */
 @theme {
-  --color-steel: #e8ecee;
-  --color-steel-dark: #d5dbde;
+  --color-steel: #ebe7dc; /* quiet fills and dividers on white */
+  --color-steel-dark: #0a0a0a; /* outlines of unselected chips and dashed edges: black, like tiles */
   --color-brand: #0a0a0a;
   --color-saffron: #f2a93b; /* accents and highlights only, never body text on white */
   --color-saffron-soft: #fcefd9;
@@ -12,13 +13,46 @@
   --color-muted: #5e6469;
   --color-chilli: #c73a2b;
 
-  --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --font-brand: "Sora", system-ui, sans-serif; /* the wordmark only */
-  --font-body: "Hind", system-ui, sans-serif;
+  --font-body: "DM Sans Variable", system-ui, sans-serif;
+
+  --shadow-pop: 4px 4px 0 var(--color-ink); /* the hard shadow, for the main action only */
+}
+
+/* A card: white, with the black outline. */
+@utility tile {
+  border-radius: 1.25rem;
+  border: 2px solid var(--color-ink);
+  background: #fff;
+}
+
+/* A quieter card for hints and empty states. */
+@utility tile-soft {
+  border-radius: 1.25rem;
+  border: 2px dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
+  background: rgb(255 255 255 / 0.6);
+}
+
+/* The main action on a screen: saffron, outlined, with the hard shadow. */
+@utility btn-pop {
+  border-radius: 1.125rem;
+  border: 2px solid var(--color-ink);
+  background: var(--color-saffron);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-display);
+  font-weight: 800;
+  &:disabled {
+    background: var(--color-steel);
+    color: var(--color-muted);
+    border-color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+    box-shadow: none;
+  }
 }
 
 html {
-  background: var(--color-steel);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-body);
   font-size: 17px;
@@ -29,6 +63,10 @@ html {
 .amount {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
+}
+
+.font-display {
+  letter-spacing: -0.02em;
 }
 
 /* The receipt: white paper with a torn zig-zag bottom edge. */

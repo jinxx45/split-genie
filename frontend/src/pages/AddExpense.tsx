@@ -121,7 +121,7 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
             placeholder={monthly ? 'Rent' : 'Cab to Baga'}
             maxLength={60}
             aria-label="What it was for"
-            className="min-w-0 rounded-2xl bg-white px-4 py-3"
+            className="min-w-0 tile px-4 py-3"
           />
           {needsAmount ? (
             <input
@@ -130,10 +130,10 @@ function ExpenseForm(props: { group: Group; you: string; monthly: boolean; onDon
               inputMode="decimal"
               placeholder="₹ 0"
               aria-label="Amount in rupees"
-              className="amount min-w-0 rounded-2xl bg-white px-4 py-3 text-right"
+              className="amount min-w-0 tile px-4 py-3 text-right"
             />
           ) : (
-            <span className="flex items-center justify-center rounded-2xl bg-white/60 px-2 text-center text-sm text-muted">
+            <span className="flex items-center justify-center tile-soft px-2 text-center text-sm text-muted">
               Asked each month
             </span>
           )}

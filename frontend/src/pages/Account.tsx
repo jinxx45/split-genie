@@ -14,7 +14,7 @@ import { Avatar, ErrorText, KindIcon } from '../ui'
 export function SignedInBar({ me, setMe }: { me: Me; setMe: (me: Me) => void }) {
   if (!me.user) return null
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white/60 p-3">
+    <div className="flex items-center gap-3 tile-soft p-3">
       <Avatar name={me.user.name} color="var(--color-brand)" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold">Signed in as {me.user.name}</span>
@@ -49,7 +49,7 @@ export function SignInBox(props: { title: string; why: string; setMe: (me: Me) =
 
   if (!clientId) return null
   return (
-    <section className="mt-10 rounded-2xl bg-white/60 p-4">
+    <section className="mt-10 tile-soft p-4">
       <p className="font-display text-lg font-semibold">{props.title}</p>
       <p className="mb-3 text-sm text-muted">{props.why}</p>
       <GoogleButton clientId={clientId} onCredential={signIn} />
@@ -76,14 +76,14 @@ export function MyGroups() {
         </Link>
       </div>
       {groups?.length === 0 && (
-        <p className="rounded-2xl bg-white/60 p-4 text-sm text-muted">
+        <p className="tile-soft p-4 text-sm text-muted">
           A group keeps a running tab for a trip, your flat, or friends you eat out with.
         </p>
       )}
       <ul className="space-y-2">
         {groups?.map((group) => (
           <li key={group.id}>
-            <Link to={`/groups/${group.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-4">
+            <Link to={`/groups/${group.id}`} className="flex items-center gap-3 tile p-4">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-steel">
                 <KindIcon kind={group.kind} />
               </span>
@@ -117,12 +117,12 @@ export function History() {
     <div className="mb-8">
       <h2 className="mb-3 font-display text-xl font-semibold">Your splits</h2>
       {splits?.length === 0 && (
-        <p className="rounded-2xl bg-white/60 p-4 text-sm text-muted">Bills you split show here, with who has paid.</p>
+        <p className="tile-soft p-4 text-sm text-muted">Bills you split show here, with who has paid.</p>
       )}
       <ul className="space-y-2">
         {splits?.map((split) => (
           <li key={split.id}>
-            <Link to={`/split/${split.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-4">
+            <Link to={`/split/${split.id}`} className="flex items-center gap-3 tile p-4">
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{split.name || split.people.join(', ')}</span>
                 <span className="text-sm text-muted">

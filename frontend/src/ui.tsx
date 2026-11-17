@@ -21,12 +21,12 @@ export function Screen(props: {
         {props.step && <Steps current={props.step} />}
       </header>
       <main className="flex-1 px-4 pt-6 pb-48">
-        <h1 className="font-display text-[2rem] leading-tight font-semibold">{props.title}</h1>
+        <h1 className="font-display text-[2.1rem] leading-[1.05] font-extrabold">{props.title}</h1>
         <div className="mt-5">{props.children}</div>
       </main>
       {props.action && (
-        <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-steel from-60% to-transparent pt-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto max-w-md px-4">{props.action}</div>
+        <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-paper from-60% to-transparent pt-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto max-w-md pr-5 pl-4">{props.action}</div>
         </div>
       )}
     </div>
@@ -74,7 +74,7 @@ export function PrimaryButton(props: {
       type={props.type ?? 'button'}
       onClick={props.onClick}
       disabled={props.disabled || props.busy}
-      className="w-full rounded-2xl bg-brand px-5 py-4 font-display text-lg font-semibold text-white transition active:scale-[0.98] disabled:bg-muted/40"
+      className="btn-pop w-full px-5 py-3.5 text-lg transition active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
     >
       {props.busy ? 'Working on it…' : props.children}
     </button>
@@ -110,7 +110,7 @@ export function Avatar({ name, color }: { name: string; color: string }) {
   return (
     <span
       aria-hidden
-      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full font-display font-semibold text-white"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border-2 border-ink font-display font-bold text-white"
       style={{ background: color }}
     >
       {name.slice(0, 1).toUpperCase()}

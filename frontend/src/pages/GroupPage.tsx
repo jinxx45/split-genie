@@ -90,7 +90,7 @@ export function GroupPage() {
         !group.closed && (
           <Link
             to={addLink}
-            className="block w-full rounded-2xl bg-brand px-5 py-4 text-center font-display text-lg font-semibold text-white active:scale-[0.98]"
+            className="btn-pop block w-full px-5 py-3.5 text-center text-lg active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
           >
             Add expense
           </Link>
@@ -160,7 +160,7 @@ function Invite({ group }: { group: Group }) {
       href={`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`}
       target="_blank"
       rel="noreferrer"
-      className="mt-6 block rounded-2xl bg-white px-4 py-3 text-center font-display font-semibold"
+      className="mt-6 block tile px-4 py-3 text-center font-display font-semibold"
     >
       {group.closed ? 'Share the final settle-up on WhatsApp' : 'Invite on WhatsApp'}
     </a>
@@ -242,11 +242,11 @@ function MonthlyBills({ group, busy, act, addLink }: Ctx & { addLink: string }) 
   return (
     <Section title="Monthly bills">
       {group.recurring?.length === 0 && (
-        <p className="rounded-2xl bg-white/60 p-4 text-sm text-muted">Rent, electricity, internet: add them once.</p>
+        <p className="tile-soft p-4 text-sm text-muted">Rent, electricity, internet: add them once.</p>
       )}
       <ul className="space-y-2">
         {group.recurring?.map((bill) => (
-          <li key={bill.id} className="flex items-center gap-3 rounded-2xl bg-white p-4">
+          <li key={bill.id} className="flex items-center gap-3 tile p-4">
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{bill.title}</span>
               <span className="text-sm text-muted">
@@ -277,7 +277,7 @@ function Months({ group, you }: Ctx) {
   if (!group.months?.length) return null
   return (
     <Section title="By month">
-      <ul className="divide-y divide-steel rounded-2xl bg-white px-4">
+      <ul className="divide-y divide-steel tile px-4">
         {group.months.map((month) => (
           <li key={month.month} className="flex items-baseline justify-between py-3">
             <span className="font-semibold">{month.label}</span>
@@ -299,7 +299,7 @@ function Activity(ctx: Ctx) {
   if (group.activity.length === 0) {
     return (
       <Section title="Activity">
-        <p className="rounded-2xl bg-white/60 p-4 text-center text-muted">Nothing added yet. Add the first expense below.</p>
+        <p className="tile-soft p-4 text-center text-muted">Nothing added yet. Add the first expense below.</p>
       </Section>
     )
   }
@@ -332,7 +332,7 @@ function RepaymentLine(props: Ctx & { entry: Repayment; removing: boolean; onRem
   const { group, you, busy, entry } = props
   const paidFor = entry.expense_id ? findEntry(group, entry.expense_id) : undefined
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-white/60 px-4 py-3 text-sm">
+    <li className="flex items-center gap-3 tile-soft px-4 py-3 text-sm">
       <span className="flex-1">
         <span className="font-semibold">{capitalise(nameOrYou(entry.sender, you))}</span> paid{' '}
         <span className="font-semibold">{nameOrYou(entry.receiver, you)}</span>{' '}
@@ -377,7 +377,7 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
   const payers = Object.keys(entry.paid).map((person) => nameOrYou(person, you))
 
   return (
-    <li className="rounded-2xl bg-white">
+    <li className="tile">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-4 text-left">
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{entry.title}</span>

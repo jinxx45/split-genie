@@ -106,7 +106,7 @@ function SplitterView({ name, result, people, onMark, busy, error }: Props) {
         </>
       )}
       {receivers.map((receiver) => (
-        <label key={receiver} className="mb-3 block rounded-2xl bg-white p-4">
+        <label key={receiver} className="mb-3 block tile p-4">
           <span className="block text-sm text-muted">{receiver}’s UPI ID, so friends can pay in one tap</span>
           <input
             value={shownIds[receiver]}
@@ -193,7 +193,7 @@ function FriendView(props: Props & { friend: string; upiIds: Record<string, stri
           }
         />
       ) : (
-        <p className="rounded-2xl bg-white p-4">You’re all square. Nothing to pay.</p>
+        <p className="tile p-4">You’re all square. Nothing to pay.</p>
       )}
       {error && <ErrorText>{error}</ErrorText>}
 

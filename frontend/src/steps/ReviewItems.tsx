@@ -89,7 +89,7 @@ function AskFriends(props: {
   const message = `Splitting the bill for ${name}. Tap what you had:\n${link}`
 
   return (
-    <details open={answered.length > 0} className="group mb-3 rounded-2xl bg-white p-4">
+    <details open={answered.length > 0} className="group mb-3 tile p-4">
       <summary className="flex cursor-pointer list-none items-center justify-between font-display text-lg font-semibold">
         Ask friends what they had
         <span aria-hidden className="text-muted transition group-open:rotate-180">⌄</span>
@@ -130,7 +130,7 @@ function AskFriends(props: {
 function LightEaters(props: { people: string[]; lightEaters: string[]; onToggle: (person: string) => void }) {
   const { people, lightEaters, onToggle } = props
   return (
-    <section className="mb-6 rounded-2xl bg-white p-4">
+    <section className="mb-6 tile p-4">
       <h2 className="font-display text-lg font-semibold">Anyone eat less?</h2>
       <p className="text-sm text-muted">They pay half a share of shared food. Drinks stay as they are.</p>
       <div className="mt-3 flex flex-wrap gap-2">

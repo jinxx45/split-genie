@@ -48,7 +48,7 @@ export function WhoPaid({ question, people, answer, busy, error }: Props) {
         {people.map((person) => (
           <li key={person}>
             {several ? (
-              <label className="flex items-center gap-3 rounded-2xl bg-white p-3">
+              <label className="flex items-center gap-3 tile p-3">
                 <Avatar name={person} color={personColor(people, person)} />
                 <span className="flex-1 font-semibold">{person}</span>
                 <span className="text-muted">₹</span>

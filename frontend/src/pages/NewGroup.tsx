@@ -92,7 +92,7 @@ export function NewGroup() {
               aria-checked={kind === option.kind}
               onClick={() => setKind(option.kind)}
               className={`flex w-full items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
-                kind === option.kind ? 'border-brand bg-white' : 'border-transparent bg-white/60'
+                kind === option.kind ? 'border-ink bg-saffron-soft' : 'border-ink/25 bg-white'
               }`}
             >
               <span
@@ -117,7 +117,7 @@ export function NewGroup() {
             onChange={(event) => setName(event.target.value)}
             placeholder={example}
             maxLength={60}
-            className="mt-2 w-full rounded-2xl bg-white px-4 py-3"
+            className="mt-2 w-full tile px-4 py-3"
           />
         </label>
 
@@ -129,7 +129,7 @@ export function NewGroup() {
                 type="date"
                 value={start}
                 onChange={(event) => setStart(event.target.value)}
-                className="mt-2 w-full rounded-2xl bg-white px-3 py-3"
+                className="mt-2 w-full tile px-3 py-3"
               />
             </label>
             <label>
@@ -139,7 +139,7 @@ export function NewGroup() {
                 value={end}
                 min={start || undefined}
                 onChange={(event) => setEnd(event.target.value)}
-                className="mt-2 w-full rounded-2xl bg-white px-3 py-3"
+                className="mt-2 w-full tile px-3 py-3"
               />
             </label>
             <p className="col-span-2 -mt-1 text-sm text-muted">Optional.</p>

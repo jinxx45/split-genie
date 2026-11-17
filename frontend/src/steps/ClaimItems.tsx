@@ -37,7 +37,7 @@ export function ClaimItems({ name, question, friend, onClaim, busy, error }: Pro
         action={<SecondaryButton onClick={() => setEditing(true)}>Change my answer</SecondaryButton>}
       >
         <p className="text-muted">Your answer has been sent. Open this link again later to see what you owe.</p>
-        <ul className="mt-5 space-y-1 rounded-2xl bg-white p-4">
+        <ul className="mt-5 space-y-1 tile p-4">
           {chosen.length === 0 && <li className="text-muted">You said you had none of these items.</li>}
           {chosen.map((entry) => (
             <li key={entry.index}>{describeClaim(entry.item.name, entry.item.quantity, claimed[entry.index])}</li>
@@ -63,7 +63,7 @@ export function ClaimItems({ name, question, friend, onClaim, busy, error }: Pro
       </p>
       <ul className="space-y-3">
         {question.items.map((entry) => (
-          <li key={entry.index} className="rounded-2xl bg-white p-4">
+          <li key={entry.index} className="tile p-4">
             <div className="flex items-baseline justify-between gap-3">
               <span className="font-semibold">{itemLabel(entry.item)}</span>
               <span className="amount">{formatRupees(entry.item.amount_paise)}</span>
