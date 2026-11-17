@@ -35,7 +35,7 @@ export function PeoplePicker(props: { people: string[]; onChange: (people: strin
             type="button"
             onClick={() => onChange(people.filter((p) => p !== person))}
             aria-label={`Remove ${person}`}
-            className="flex items-center gap-2 rounded-2xl border-2 border-ink bg-white py-1 pr-3 pl-1 font-semibold"
+            className="flex items-center gap-2 rounded-2xl border-2 border-line bg-white py-1 pr-3 pl-1 font-semibold"
           >
             <Avatar name={person} color={personColor(people, person)} />
             {person}
@@ -105,7 +105,7 @@ export function MemberToggles(props: { members: string[]; chosen: string[]; onCh
             className="rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition active:scale-95"
             style={{
               borderColor: on ? color : 'var(--color-steel-dark)',
-              background: on ? color : '#fff',
+              background: on ? color : 'var(--color-white)',
               color: on ? '#fff' : 'var(--color-muted)',
             }}
           >
@@ -132,7 +132,7 @@ export function PayerPicker(props: { people: string[]; paidBy: string; onChange:
             aria-checked={on}
             onClick={() => props.onChange(person)}
             className="rounded-full border-2 px-3 py-1.5 text-sm font-semibold"
-            style={{ borderColor: on ? color : 'var(--color-steel-dark)', background: on ? color : '#fff', color: on ? '#fff' : 'var(--color-muted)' }}
+            style={{ borderColor: on ? color : 'var(--color-steel-dark)', background: on ? color : 'var(--color-white)', color: on ? '#fff' : 'var(--color-muted)' }}
           >
             {person === props.you ? `${person} (you)` : person}
           </button>

@@ -44,7 +44,7 @@ export function SettleTabs(ctx: GroupCtx) {
                 setTab(option.id)
                 setOpen(null)
               }}
-              className={`rounded-[1.25rem] border-2 border-ink p-3.5 text-left transition ${on ? 'bg-saffron shadow-pop' : 'bg-white'}`}
+              className={`rounded-[1.25rem] border-2 border-line p-3.5 text-left transition ${on ? 'bg-saffron text-coal pop-shadow' : 'bg-white'}`}
             >
               <span className={`block text-sm font-bold ${on ? '' : 'text-muted'}`}>{option.label}</span>
               <span className={`amount block text-2xl ${on ? 'font-extrabold' : 'font-bold'}`}>
@@ -307,7 +307,7 @@ export function Chevron({ open }: { open: boolean }) {
   return (
     <span
       aria-hidden
-      className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] border-2 border-ink transition-transform ${open ? 'rotate-180 bg-ink text-paper' : ''}`}
+      className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] border-2 border-line transition-transform ${open ? 'rotate-180 bg-ink text-paper' : ''}`}
     >
       <svg
         viewBox="0 0 24 24"

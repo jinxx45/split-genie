@@ -4,10 +4,15 @@ import { createRoot } from 'react-dom/client'
 // subsets a page uses: latin, plus the one holding the rupee sign.
 import '@fontsource-variable/bricolage-grotesque/wght.css'
 import '@fontsource-variable/dm-sans/wght.css'
+import '@fontsource-variable/figtree/wght.css' // the Clean theme
+import '@fontsource-variable/manrope/wght.css' // the Midnight theme
 import '@fontsource/sora/latin-300.css'
 import '@fontsource/sora/latin-700.css'
 import './index.css'
 import App from './App.tsx'
+import { applyTheme, savedTheme } from './theme'
+
+applyTheme(savedTheme()) // before the first paint, so the page doesn't flash another theme
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

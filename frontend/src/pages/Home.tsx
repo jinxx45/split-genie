@@ -27,8 +27,8 @@ export function Home() {
       <div className={`mr-1 grid grid-cols-2 gap-3 ${user ? 'mt-4' : ''}`}>
         {/* A label around a hidden file input: tapping it opens the phone's own "Camera or Gallery"
             chooser, with no extra screen first. */}
-        <label className={`${TILE} col-span-2 cursor-pointer items-center gap-4 bg-saffron shadow-pop`}>
-          <span aria-hidden className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-ink text-saffron">
+        <label className={`${TILE} col-span-2 cursor-pointer items-center gap-4 bg-saffron text-coal pop-shadow`}>
+          <span aria-hidden className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-coal text-saffron">
             <CameraIcon />
           </span>
           <span>
@@ -82,7 +82,7 @@ export function Home() {
 }
 
 /** The start tiles share this shape: outlined, and they press in when tapped. */
-const TILE = 'flex rounded-[1.25rem] border-2 border-ink p-4 transition active:scale-[0.98]'
+const TILE = 'flex rounded-[1.25rem] border-2 border-line p-4 transition active:scale-[0.98]'
 
 const iconProps = {
   viewBox: '0 0 24 24',

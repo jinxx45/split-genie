@@ -1,45 +1,107 @@
 @import "tailwindcss";
 
-/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, saffron and paper. The look is
-   "Pop": a paper page, white tiles with a black outline, and a hard shadow on the main action. */
+/* Design tokens, from the Split Rupya kit (brand/BRAND.md): black, saffron and paper.
+   These are the "Pop" theme, the default: a paper page, white tiles with a black outline, and a
+   hard shadow on the main action. "Clean" and "Midnight" below override the same names, so
+   every screen follows the theme the person picks (see theme.ts). */
 @theme {
-  --color-steel: #ebe7dc; /* quiet fills and dividers on white */
-  --color-steel-dark: #0a0a0a; /* outlines of unselected chips and dashed edges: black, like tiles */
-  --color-brand: #0a0a0a;
+  --color-paper: #f6f4ee; /* the page */
+  --color-white: #ffffff; /* cards and inputs, and text on brand-coloured buttons */
+  --color-ink: #0a0a0a; /* text */
+  --color-brand: #0a0a0a; /* solid buttons */
+  --color-muted: #5e6469;
+  --color-steel: #ebe7dc; /* quiet fills and dividers on cards */
+  --color-steel-dark: #0a0a0a; /* outlines of unselected chips and dashed edges */
+  --color-line: #0a0a0a; /* outlines of tiles, avatars and chevrons */
   --color-saffron: #f2a93b; /* accents and highlights only, never body text on white */
   --color-saffron-soft: #fcefd9;
-  --color-paper: #f6f4ee; /* text on black */
-  --color-ink: #0a0a0a;
-  --color-muted: #5e6469;
+  --color-saffron-deep: #6b4200; /* text on saffron-soft */
+  --color-good: #1e5c3c; /* "settled" */
+  --color-good-soft: #e3efe7;
   --color-chilli: #c73a2b;
+  --color-coal: #0a0a0a; /* text on saffron: dark in every theme */
+  --color-snow: #ffffff; /* text on a person's colour: white in every theme */
 
   --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --font-brand: "Sora", system-ui, sans-serif; /* the wordmark only */
   --font-body: "DM Sans Variable", system-ui, sans-serif;
-
-  --shadow-pop: 4px 4px 0 var(--color-ink); /* the hard shadow, for the main action only */
 }
 
-/* A card: white, with the black outline. */
+:root {
+  --shadow-pop: 4px 4px 0 var(--color-ink); /* the hard shadow, for the main action only */
+  --tile-border: 2px;
+  --tile-radius: 1.25rem;
+  --btn-bg: var(--color-saffron);
+  --btn-fg: var(--color-coal);
+  --btn-border: 2px solid var(--color-ink);
+  --btn-radius: 1.125rem;
+}
+
+/* Clean: white and airy, thin grey lines, black pill buttons. */
+:root[data-theme='clean'] {
+  --color-paper: #ffffff;
+  --color-steel: #f3f1ea;
+  --color-steel-dark: #cfd4d7;
+  --color-line: #e4e0d6;
+  --font-display: "Figtree Variable", system-ui, sans-serif;
+  --font-body: "Figtree Variable", system-ui, sans-serif;
+  --shadow-pop: 0 0 #0000;
+  --tile-border: 1px;
+  --btn-bg: var(--color-brand);
+  --btn-fg: #ffffff;
+  --btn-border: 0 solid transparent;
+  --btn-radius: 999px;
+}
+
+/* Midnight: black page, dark cards, saffron as the light. White and brand swap roles, so a
+   "white card" is dark and a "brand button" is light with dark text. */
+:root[data-theme='midnight'] {
+  color-scheme: dark;
+  --color-paper: #0a0a0a;
+  --color-white: #17171a;
+  --color-ink: #f6f4ee;
+  --color-brand: #f6f4ee;
+  --color-muted: #a1a5a9;
+  --color-steel: #26262a;
+  --color-steel-dark: #4a4a50;
+  --color-line: #2e2e33;
+  --color-saffron-soft: #3a2c12;
+  --color-saffron-deep: #f2a93b;
+  --color-good: #7fd4a0;
+  --color-good-soft: #14301f;
+  --color-chilli: #ff7a6b;
+  --font-display: "Manrope Variable", system-ui, sans-serif;
+  --font-body: "Manrope Variable", system-ui, sans-serif;
+  --shadow-pop: 0 0 #0000;
+  --tile-border: 1px;
+  --btn-border: 0 solid transparent;
+}
+
+/* A card. */
 @utility tile {
-  border-radius: 1.25rem;
-  border: 2px solid var(--color-ink);
-  background: #fff;
+  border-radius: var(--tile-radius);
+  border: var(--tile-border) solid var(--color-line);
+  background: var(--color-white);
 }
 
 /* A quieter card for hints and empty states. */
 @utility tile-soft {
-  border-radius: 1.25rem;
-  border: 2px dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
-  background: rgb(255 255 255 / 0.6);
+  border-radius: var(--tile-radius);
+  border: var(--tile-border) dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
+  background: color-mix(in srgb, var(--color-white) 60%, transparent);
 }
 
-/* The main action on a screen: saffron, outlined, with the hard shadow. */
+/* The hard shadow on its own (Pop only: the other themes set it to nothing). */
+@utility pop-shadow {
+  box-shadow: var(--shadow-pop);
+}
+
+/* The main action on a screen. */
 @utility btn-pop {
-  border-radius: 1.125rem;
-  border: 2px solid var(--color-ink);
-  background: var(--color-saffron);
-  color: var(--color-ink);
+  border-radius: var(--btn-radius);
+  border: var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
   box-shadow: var(--shadow-pop);
   font-family: var(--font-display);
   font-weight: 800;
@@ -72,7 +134,7 @@ html {
 /* The receipt: white paper with a torn zig-zag bottom edge. */
 .receipt {
   --tooth: 9px;
-  background: #fff;
+  background: var(--color-white);
   padding-bottom: calc(var(--tooth) + 16px);
   mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% /
     calc(2 * var(--tooth)) 100%;

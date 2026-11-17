@@ -146,7 +146,7 @@ function LightEaters(props: { people: string[]; lightEaters: string[]; onToggle:
               className="rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition active:scale-95"
               style={{
                 borderColor: on ? color : 'var(--color-steel-dark)',
-                background: on ? `linear-gradient(90deg, ${color}66 50%, #fff 50%)` : '#fff',
+                background: on ? `linear-gradient(90deg, ${color}66 50%, var(--color-white) 50%)` : 'var(--color-white)',
                 color: on ? 'var(--color-ink)' : 'var(--color-muted)',
               }}
             >

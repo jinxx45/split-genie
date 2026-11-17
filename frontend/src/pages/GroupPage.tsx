@@ -22,7 +22,8 @@ import { capitalise, dateRange, findEntry, groupLink, KIND_NAMES, nameOrYou, rem
 import type { GroupCtx } from '../groups'
 import { formatRupees, parseRupees } from '../money'
 import { upiLink } from '../upi'
-import { ErrorText, KindIcon, Screen, WhoAreYou } from '../ui'
+import { personColor } from '../colors'
+import { Avatar, ErrorText, KindIcon, Screen, WhoAreYou } from '../ui'
 import { Chevron, SettleTabs, ShareSummary } from './GroupSettle'
 import { Reading } from './Reading'
 
@@ -82,10 +83,18 @@ export function GroupPage() {
   const you = member
   const ctx = { group, you, busy, act }
   const addLink = `/groups/${group.id}/add`
+  const dates = dateRange(group.start_date, group.end_date)
 
   return (
     <Screen
       title={group.name}
+      note={
+        <>
+          <KindIcon kind={group.kind} className="size-4" />
+          {KIND_NAMES[group.kind]}
+          {group.kind === 'trip' && dates && `, ${dates}`}
+        </>
+      }
       action={
         !group.closed && (
           <Link
@@ -97,16 +106,11 @@ export function GroupPage() {
         )
       }
     >
-      <p className="-mt-3 mb-5 flex items-center gap-2 text-muted">
-        <KindIcon kind={group.kind} className="size-4" />
-        {KIND_NAMES[group.kind]}
-        {group.kind === 'trip' && dateRange(group.start_date, group.end_date) && `, ${dateRange(group.start_date, group.end_date)}`}
-        <span className="ml-auto text-sm">
-          You’re {you}.{' '}
-          <button type="button" onClick={() => setParams({ who: '' })} className="underline">
-            Not you?
-          </button>
-        </span>
+      <p className="-mt-3 mb-4 text-sm text-muted">
+        You’re {you}.{' '}
+        <button type="button" onClick={() => setParams({ who: '' })} className="underline">
+          Not you?
+        </button>
       </p>
 
       {group.closed && (
@@ -122,6 +126,7 @@ export function GroupPage() {
       {group.debts.length > 0 && <ShareSummary group={group} />}
       {group.kind === 'flat' && <MonthlyBills {...ctx} addLink={`${addLink}?monthly`} />}
       {group.kind === 'flat' && <Months {...ctx} />}
+      <Leaderboard {...ctx} />
       <Invite group={group} />
       {group.kind === 'trip' && group.is_owner && <TripControls {...ctx} />}
       {error && <ErrorText>{error}</ErrorText>}
@@ -131,15 +136,79 @@ export function GroupPage() {
 
 type Ctx = GroupCtx
 
-/** What it's cost you so far, and everyone together. */
+/** What it's cost you so far. Opens to your part of each expense, e.g. "Petrol ₹2,000.00". */
 function Cost({ group, you }: Ctx) {
+  const [open, setOpen] = useState(false)
   if (group.total_paise === 0) return null
+  // Your own parts, biggest first. Expenses you weren't in are left out.
+  const mine = group.activity
+    .flatMap((entry) => (entry.type === 'expense' && entry.owed[you] ? [{ id: entry.id, title: entry.title, part: entry.owed[you] }] : []))
+    .sort((first, second) => second.part - first.part)
+
   return (
-    <p className="mt-3 text-center text-sm text-muted">
-      {group.kind === 'trip' ? 'The trip cost you' : 'Your share so far'}{' '}
-      <span className="amount font-semibold text-ink">{formatRupees(group.spent[you] ?? 0)}</span>, everyone together{' '}
-      <span className="amount">{formatRupees(group.total_paise)}</span>
-    </p>
+    <div className="tile mt-3">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-3 p-4 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">{group.kind === 'trip' ? 'The trip cost you' : 'Your share so far'}</span>
+          <span className="text-sm text-muted">Everyone together {formatRupees(group.total_paise)}</span>
+        </span>
+        <span className="amount text-xl font-bold">{formatRupees(group.spent[you] ?? 0)}</span>
+        <Chevron open={open} />
+      </button>
+      {open && (
+        <ul className="px-4 pb-4 text-sm">
+          {mine.map((item, index) => (
+            <li key={item.id} className={`flex justify-between gap-3 py-1 ${index === 0 ? 'border-t border-dashed border-steel-dark pt-2' : ''}`}>
+              <span className="min-w-0 truncate">{item.title}</span>
+              <span className="amount shrink-0">{formatRupees(item.part)}</span>
+            </li>
+          ))}
+          {mine.length === 0 && <li className="border-t border-dashed border-steel-dark pt-2 text-muted">You’re not in any expense yet.</li>}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** Who spent the most, down to the least: each person's own share of everything, with what they
+ * paid up front alongside. */
+function Leaderboard({ group, you }: Ctx) {
+  if (group.total_paise === 0) return null
+  const paid = Object.fromEntries(group.members.map((member) => [member, 0]))
+  for (const entry of group.activity) {
+    if (entry.type !== 'expense') continue
+    for (const [person, amount] of Object.entries(entry.paid)) paid[person] = (paid[person] ?? 0) + amount
+  }
+  const ranked = [...group.members].sort((first, second) => (group.spent[second] ?? 0) - (group.spent[first] ?? 0))
+  const top = group.spent[ranked[0]] ?? 0
+
+  return (
+    <Section title="Who spent the most">
+      <ol className="tile divide-y divide-steel px-4">
+        {ranked.map((person, index) => {
+          const spent = group.spent[person] ?? 0
+          return (
+            <li key={person} className="py-3">
+              <div className="flex items-center gap-2.5">
+                <span className="amount w-4 text-center font-bold text-muted">{index + 1}</span>
+                <Avatar name={person} color={personColor(group.members, person)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{person === you ? 'You' : person}</span>
+                  <span className="block truncate text-sm text-muted">Paid {formatRupees(paid[person] ?? 0)}</span>
+                </span>
+                <span className="amount text-lg font-bold">{formatRupees(spent)}</span>
+              </div>
+              <div className="mt-2 ml-8 h-2 rounded-full bg-steel" aria-hidden>
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${top ? Math.round((spent / top) * 100) : 0}%`, background: personColor(group.members, person) }}
+                />
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+    </Section>
   )
 }
 
@@ -187,7 +256,7 @@ function TripControls({ group, busy, act }: Ctx) {
       type="button"
       disabled={busy}
       onClick={() => (confirming ? act(() => setGroupClosed(group.id, true)) : setConfirming(true))}
-      className={`mt-3 w-full rounded-2xl py-3 font-display font-semibold ${confirming ? 'bg-chilli text-white' : 'bg-white'}`}
+      className={`mt-3 w-full py-3 font-display font-semibold ${confirming ? 'rounded-[1.25rem] bg-chilli text-white' : 'tile'}`}
     >
       {confirming ? 'Tap again to end the trip' : 'End trip and settle up'}
     </button>
@@ -391,11 +460,11 @@ function ExpenseCard(props: Ctx & { entry: Expense; removing: boolean; onRemove:
               .join(', ')}
             {yours.length > 0 &&
               (unpaid.length ? (
-                <span className="rounded-full bg-saffron-soft px-2 font-semibold text-[#6b4200]">
+                <span className="rounded-full bg-saffron-soft px-2 font-semibold text-saffron-deep">
                   you owe {formatRupees(unpaid.reduce((sum, owe) => sum + left(owe), 0))}
                 </span>
               ) : (
-                <span className="rounded-full bg-[#e3efe7] px-2 font-semibold text-[#1e5c3c]">settled</span>
+                <span className="rounded-full bg-good-soft px-2 font-semibold text-good">settled</span>
               ))}
           </span>
         </span>

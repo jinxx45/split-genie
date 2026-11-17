@@ -1,13 +1,17 @@
 // Small building blocks shared by every screen.
 
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import type { GroupKind, Weight } from './api'
 import { personColor } from './colors'
+import { applyTheme, savedTheme, THEME_NAMES, THEMES } from './theme'
+import type { Theme } from './theme'
 
 /** The page frame: small header, an optional step indicator, content, and one pinned action. */
 export function Screen(props: {
   title: string
+  note?: ReactNode // small print on the title's line, e.g. "Trip, 13 to 15 Nov"
   step?: number // 1-4 while answering questions
   children: ReactNode
   action?: ReactNode
@@ -18,10 +22,13 @@ export function Screen(props: {
         <Link to="/" aria-label="Split Rupya, start a new split">
           <Logo />
         </Link>
-        {props.step && <Steps current={props.step} />}
+        {props.step ? <Steps current={props.step} /> : <ThemePicker />}
       </header>
       <main className="flex-1 px-4 pt-6 pb-48">
-        <h1 className="font-display text-[2.1rem] leading-[1.05] font-extrabold">{props.title}</h1>
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <h1 className={`font-display leading-[1.05] font-extrabold ${props.note ? 'text-[1.7rem]' : 'text-[2.1rem]'}`}>{props.title}</h1>
+          {props.note && <span className="flex items-center gap-1.5 text-sm whitespace-nowrap text-muted">{props.note}</span>}
+        </div>
         <div className="mt-5">{props.children}</div>
       </main>
       {props.action && (
@@ -42,6 +49,43 @@ export function Logo() {
         <span className="font-bold">Split</span> <span className="font-light">Rupya</span>
       </span>
     </span>
+  )
+}
+
+/** Three swatches at the top right: tap one to switch the app's look. Each swatch is drawn in
+ * its own theme's colours, whatever theme is on. */
+const SWATCHES: Record<Theme, string> = {
+  pop: 'border-2 border-[#0a0a0a] bg-[#f2a93b]',
+  clean: 'border border-[#cfd4d7] bg-[#ffffff]',
+  midnight: 'border border-[#4a4a50] bg-[#0a0a0a]',
+}
+
+function ThemePicker() {
+  const [theme, setTheme] = useState<Theme>(savedTheme)
+  return (
+    <div role="radiogroup" aria-label="Theme" className="flex items-center gap-1">
+      {THEMES.map((option) => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={theme === option}
+          aria-label={`${THEME_NAMES[option]} theme`}
+          title={THEME_NAMES[option]}
+          onClick={() => {
+            applyTheme(option)
+            setTheme(option)
+          }}
+          className="flex size-9 items-center justify-center rounded-full"
+        >
+          <span
+            className={`block size-6 rounded-full ${SWATCHES[option]} ${
+              theme === option ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''
+            }`}
+          />
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -110,7 +154,7 @@ export function Avatar({ name, color }: { name: string; color: string }) {
   return (
     <span
       aria-hidden
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border-2 border-ink font-display font-bold text-white"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border-2 border-line font-display font-bold text-snow"
       style={{ background: color }}
     >
       {name.slice(0, 1).toUpperCase()}
@@ -131,7 +175,7 @@ export function ShareChip(props: {
   const label = weight === 2 ? 'full share' : weight === 1 ? 'half share' : 'not included'
   const background =
     // Half share: the left half is tinted (40% alpha), so dark text stays readable across it.
-    weight === 2 ? color : weight === 1 ? `linear-gradient(90deg, ${color}66 50%, #fff 50%)` : '#fff'
+    weight === 2 ? color : weight === 1 ? `linear-gradient(90deg, ${color}66 50%, var(--color-white) 50%)` : 'var(--color-white)'
   return (
     <button
       type="button"

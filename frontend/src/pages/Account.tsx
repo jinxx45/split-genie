@@ -15,7 +15,7 @@ export function SignedInBar({ me, setMe }: { me: Me; setMe: (me: Me) => void }) 
   if (!me.user) return null
   return (
     <div className="flex items-center gap-3 tile-soft p-3">
-      <Avatar name={me.user.name} color="var(--color-brand)" />
+      <Avatar name={me.user.name} color="var(--color-coal)" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold">Signed in as {me.user.name}</span>
         <span className="block truncate text-xs text-muted">{me.user.email}</span>
