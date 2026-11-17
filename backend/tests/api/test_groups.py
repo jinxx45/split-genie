@@ -83,9 +83,9 @@ def test_quick_expenses_update_balances_and_settle_up(client):
 
     # Priya paid 900 and owes 300; Arun paid 300 and owes 300 + 100; Ravi owes 300 + 200.
     assert group["balances"] == {"Priya": 60000, "Arun": -10000, "Ravi": -50000}
-    assert sorted(group["settle_up"], key=lambda p: p["sender"]) == [
-        {"sender": "Arun", "receiver": "Priya", "amount_paise": 10000},
-        {"sender": "Ravi", "receiver": "Priya", "amount_paise": 50000},
+    # Pair by pair: Ravi owes Priya for the first and Arun for the second; Arun owes Priya.
+    assert [(d["sender"], d["receiver"], d["amount_paise"]) for d in group["debts"]] == [
+        ("Arun", "Priya", 30000), ("Ravi", "Priya", 30000), ("Ravi", "Arun", 20000),
     ]
     assert group["spent"] == {"Priya": 30000, "Arun": 40000, "Ravi": 50000}
     assert group["activity"][1]["added_by"] == "Arun"
@@ -102,6 +102,46 @@ def test_a_repayment_settles_balances_and_can_be_undone(client):
     repayment = next(entry for entry in group["activity"] if entry["type"] == "repayment")
     group = client.delete(f"/api/groups/{group_id}/repayments/{repayment['id']}").json()
     assert group["balances"]["Arun"] == -30000
+
+
+def test_each_debt_lists_the_expenses_it_comes_from(client):
+    group_id = new_group(client).json()["id"]
+    dinner = quick(client, group_id, 90000, title="Dinner").json()["activity"][0]
+    cab = quick(client, group_id, 30000, paid_by="Arun", weights={"Priya": 1, "Arun": 1, "Ravi": 1}, title="Cab").json()
+
+    arun_priya = next(d for d in cab["debts"] if (d["sender"], d["receiver"]) == ("Arun", "Priya"))
+
+    cab_id = cab["activity"][0]["id"]
+    assert arun_priya["amount_paise"] == 20000
+    assert arun_priya["entries"] == [{"ref": dinner["id"], "amount_paise": 30000}, {"ref": cab_id, "amount_paise": -10000}]
+    assert {"sender": "Ravi", "receiver": "Arun", "amount_paise": 10000} in cab["activity"][0]["owes"]
+
+
+def test_you_can_only_mark_your_own_payments(client):
+    group_id = new_group(client).json()["id"]
+    quick(client, group_id, 90000)
+
+    body = {"sender": "Arun", "receiver": "Priya", "amount_paise": 30000, "by": "Ravi"}
+    response = client.post(f"/api/groups/{group_id}/repayments", json=body)
+
+    assert response.status_code == 403 and "you made or received" in response.json()["detail"]
+    body["by"] = "Priya"  # the receiver confirming it is fine
+    assert client.post(f"/api/groups/{group_id}/repayments", json=body).status_code == 201
+
+
+def test_paying_your_part_of_one_expense(client):
+    group_id = new_group(client).json()["id"]
+    dinner_id = quick(client, group_id, 90000, title="Dinner").json()["activity"][0]["id"]
+
+    body = {"sender": "Arun", "receiver": "Priya", "amount_paise": 30000, "by": "Arun", "expense_id": dinner_id}
+    group = client.post(f"/api/groups/{group_id}/repayments", json=body).json()
+
+    repayment = next(entry for entry in group["activity"] if entry["type"] == "repayment")
+    assert repayment["expense_id"] == dinner_id
+    assert [d["sender"] for d in group["debts"]] == ["Ravi"]  # Arun is square with Priya
+    body["sender"], body["receiver"], body["by"] = "Priya", "Arun", "Priya"
+    response = client.post(f"/api/groups/{group_id}/repayments", json=body)
+    assert response.status_code == 422 and "Priya doesn't owe Arun for Dinner" in response.json()["detail"]
 
 
 def test_an_expense_can_be_deleted(client):

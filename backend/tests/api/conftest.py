@@ -54,6 +54,6 @@ def client(tmp_path, monkeypatch):
         with database.connection() as connection:
             connection.execute(
                 "TRUNCATE payments, claims, photos, users, split_owners, friends,"
-                " groups, group_users, expenses, repayments, recurring"
+                " groups, group_users, expenses, repayments, repayment_expenses, recurring"
             )
         database.pool.close()

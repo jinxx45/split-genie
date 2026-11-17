@@ -16,7 +16,14 @@ from pydantic import BaseModel, Field
 from app.api.accounts import User
 from app.api.auth import current_user, require_user
 from app.api.db import get_database
-from app.api.group_store import ExpenseRow, Group, GroupKind, GroupStore, RecurringRow
+from app.api.group_store import (
+    ExpenseRow,
+    Group,
+    GroupKind,
+    GroupStore,
+    RecurringRow,
+    RepaymentRow,
+)
 from app.api.schemas import (
     MAX_NAME_LENGTH,
     MAX_SPLIT_NAME_LENGTH,
@@ -27,11 +34,12 @@ from app.api.schemas import (
 from app.money.ledger import (
     Expense,
     Repayment,
+    expense_debts,
     group_balances,
+    pairwise_debts,
     share_amount,
     spent_by_person,
 )
-from app.money.settle import settle
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -78,7 +86,8 @@ class RepaymentIn(BaseModel):
     sender: Member
     receiver: Member
     amount_paise: int = Field(ge=1, le=MAX_EXPENSE_PAISE)
-    by: Member  # who is recording it
+    by: Member  # who is recording it: must be the sender or the receiver
+    expense_id: str | None = None  # paying for one expense, e.g. your part of the dinner
 
 
 class UpiIn(BaseModel):
@@ -181,7 +190,15 @@ def add_repayment(
     check_member(group, body.sender, body.receiver, body.by)
     if body.sender == body.receiver:
         raise reject("Someone can't pay themselves.")
-    groups.add_repayment(group_id, body.sender, body.receiver, body.amount_paise, body.by)
+    if body.by not in (body.sender, body.receiver):
+        raise HTTPException(status_code=403, detail="You can only mark payments you made or received.")
+    if body.expense_id is not None:
+        expense = next((e for e in groups.expenses(group_id) if e.id == body.expense_id), None)
+        if expense is None:
+            raise HTTPException(status_code=404, detail="That expense isn't in this group.")
+        if (body.sender, body.receiver) not in expense_debts(to_ledger([expense])[0]):
+            raise reject(f"{body.sender} doesn't owe {body.receiver} for {expense.title}.")
+    groups.add_repayment(group_id, body.sender, body.receiver, body.amount_paise, body.by, body.expense_id)
     return describe_group(groups, group, user)
 
 
@@ -332,12 +349,15 @@ def add_due_fixed_bills(groups: GroupStore, group: Group, expenses: list[Expense
 
 
 def to_ledger(expenses: list[ExpenseRow]) -> list[Expense]:
-    return [Expense(paid=expense.paid, owed=expense.owed) for expense in expenses]
+    return [Expense(paid=expense.paid, owed=expense.owed, id=expense.id) for expense in expenses]
+
+
+def to_repayments(rows: list[RepaymentRow]) -> list[Repayment]:
+    return [Repayment(r.sender, r.receiver, r.amount_paise, id=r.id) for r in rows]
 
 
 def balances_of(groups: GroupStore, group: Group) -> dict[str, int]:
-    repayments = [Repayment(r.sender, r.receiver, r.amount_paise) for r in groups.repayments(group.id)]
-    return group_balances(group.members, to_ledger(groups.expenses(group.id)), repayments)
+    return group_balances(group.members, to_ledger(groups.expenses(group.id)), to_repayments(groups.repayments(group.id)))
 
 
 def expense_month(expense: ExpenseRow) -> str:
@@ -350,12 +370,12 @@ def expense_month(expense: ExpenseRow) -> str:
 
 
 def describe_group(groups: GroupStore, group: Group, user: User | None) -> dict:
-    """The group as the app shows it: balances, how to settle up, and everything in its tab."""
+    """The group as the app shows it: balances, who owes whom, and everything in its tab."""
     expenses = groups.expenses(group.id)
     if group.kind == "flat" and add_due_fixed_bills(groups, group, expenses):
         expenses = groups.expenses(group.id)
     repayment_rows = groups.repayments(group.id)
-    repayments = [Repayment(r.sender, r.receiver, r.amount_paise) for r in repayment_rows]
+    repayments = to_repayments(repayment_rows)
     ledger = to_ledger(expenses)
     balances = group_balances(group.members, ledger, repayments)
     spent = spent_by_person(group.members, ledger)
@@ -365,12 +385,18 @@ def describe_group(groups: GroupStore, group: Group, user: User | None) -> dict:
             "type": "expense", "id": e.id, "title": e.title, "source": e.source,
             "total_paise": sum(e.paid.values()), "paid": e.paid, "owed": e.owed,
             "added_by": e.added_by, "created_at": e.created_at, "split_id": e.split_id,
+            # Who owes whom for this expense alone, so each person can pay their part of it.
+            "owes": [
+                {"sender": sender, "receiver": receiver, "amount_paise": amount}
+                for (sender, receiver), amount in expense_debts(entry).items()
+            ],
         }
-        for e in expenses
+        for e, entry in zip(expenses, ledger, strict=True)
     ] + [
         {
             "type": "repayment", "id": r.id, "sender": r.sender, "receiver": r.receiver,
             "amount_paise": r.amount_paise, "marked_by": r.marked_by, "created_at": r.created_at,
+            "expense_id": r.expense_id,
         }
         for r in repayment_rows
     ]
@@ -387,8 +413,13 @@ def describe_group(groups: GroupStore, group: Group, user: User | None) -> dict:
         "closed": group.closed_at is not None,
         "is_owner": user is not None and user.id == group.owner_id,
         "balances": balances,
-        "settle_up": [
-            {"sender": p.sender, "receiver": p.receiver, "amount_paise": p.amount_paise} for p in settle(balances)
+        # Pair by pair, like Google Pay: who still owes whom, and the expenses it comes from.
+        "debts": [
+            {
+                "sender": debt.sender, "receiver": debt.receiver, "amount_paise": debt.amount_paise,
+                "entries": [{"ref": entry.ref, "amount_paise": entry.amount_paise} for entry in debt.entries],
+            }
+            for debt in pairwise_debts(ledger, repayments)
         ],
         "spent": spent,
         "total_paise": sum(spent.values()),

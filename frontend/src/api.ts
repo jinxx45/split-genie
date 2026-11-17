@@ -194,6 +194,7 @@ export type ActivityEntry =
       added_by: string
       created_at: string
       split_id: string | null
+      owes: Payment[] // who owes whom for this expense alone
     }
   | {
       type: 'repayment'
@@ -203,7 +204,12 @@ export type ActivityEntry =
       amount_paise: number
       marked_by: string
       created_at: string
+      expense_id: string | null // set when it paid for one expense
     }
+
+/** What one member still owes another, pair by pair. Each entry is an expense or repayment id
+ * (`ref`) and how much it adds to the debt (negative: takes away). */
+export type Debt = Payment & { entries: { ref: string; amount_paise: number }[] }
 
 export type RecurringBill = {
   id: string
@@ -225,7 +231,7 @@ export type Group = {
   closed: boolean
   is_owner: boolean
   balances: Record<string, number> // positive: gets money back; negative: owes
-  settle_up: { sender: string; receiver: string; amount_paise: number }[]
+  debts: Debt[]
   spent: Record<string, number> // each person's own shares
   total_paise: number
   activity: ActivityEntry[] // newest first
@@ -268,7 +274,7 @@ export const addQuickExpense = (
 export const deleteExpense = (id: string, expenseId: string) => request<Group>(groupUrl(id, `/expenses/${expenseId}`), del)
 export const addRepayment = (
   id: string,
-  repayment: { sender: string; receiver: string; amount_paise: number; by: string },
+  repayment: { sender: string; receiver: string; amount_paise: number; by: string; expense_id?: string },
 ) => request<Group>(groupUrl(id, '/repayments'), json(repayment))
 export const deleteRepayment = (id: string, repaymentId: string) =>
   request<Group>(groupUrl(id, `/repayments/${repaymentId}`), del)

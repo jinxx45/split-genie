@@ -1,7 +1,29 @@
 // Small helpers shared by the group screens.
 
-import type { GroupKind } from './api'
+import type { ActivityEntry, Debt, Group, GroupKind } from './api'
 import { formatRupees } from './money'
+
+/** What every part of a group's page gets: the group, which member you are, and `act` to run a
+ * change and show the group the server sends back. */
+export type GroupCtx = { group: Group; you: string; busy: boolean; act: (call: () => Promise<Group>) => void }
+
+export const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** "You" for yourself, otherwise the name. */
+export const nameOrYou = (person: string, you: string) => (person === you ? 'you' : person)
+
+/** The link that opens the group; whoever opens it picks their name first. */
+export const groupLink = (group: Group) => `${window.location.origin}/groups/${group.id}?who`
+
+/** Every pair that still owes, for a WhatsApp message: "Ravi pays Priya ₹636.00". */
+export function whoPaysWhom(debts: Debt[]): string[] {
+  return debts.map((debt) => `${debt.sender} pays ${debt.receiver} ${formatRupees(debt.amount_paise)}`)
+}
+
+/** The activity entry a debt entry points at (an expense or a repayment), if it's still there. */
+export function findEntry(group: Group, ref: string): ActivityEntry | undefined {
+  return group.activity.find((entry) => entry.id === ref)
+}
 
 export const KIND_NAMES: Record<GroupKind, string> = { friends: 'Friends', trip: 'Trip', flat: 'Flatmates' }
 

@@ -51,6 +51,7 @@ class RepaymentRow:
     amount_paise: int
     marked_by: str
     created_at: str
+    expense_id: str | None = None  # set when it paid for one expense, e.g. "your part of the dinner"
 
 
 @dataclass
@@ -119,6 +120,10 @@ class GroupStore(Store):
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS repayments_by_group ON repayments (group_id);
+        CREATE TABLE IF NOT EXISTS repayment_expenses (
+            repayment_id TEXT PRIMARY KEY,
+            expense_id TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS recurring (
             id TEXT PRIMARY KEY,
             group_id TEXT NOT NULL,
@@ -249,20 +254,35 @@ class GroupStore(Store):
 
     # --- Repayments ---
 
-    def add_repayment(self, group_id: str, sender: str, receiver: str, amount_paise: int, marked_by: str) -> None:
+    def add_repayment(
+        self, group_id: str, sender: str, receiver: str, amount_paise: int, marked_by: str,
+        expense_id: str | None = None,
+    ) -> None:
+        """Record money paid back. `expense_id` links it to the one expense it paid for. The link
+        is its own table, so tables made before it existed need no change."""
+        repayment_id = new_id()
         with self.connection() as connection:
             connection.execute(
                 """
                 INSERT INTO repayments (id, group_id, sender, receiver, amount_paise, marked_by, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (new_id(), group_id, sender, receiver, amount_paise, marked_by, now()),
+                (repayment_id, group_id, sender, receiver, amount_paise, marked_by, now()),
             )
+            if expense_id:
+                connection.execute(
+                    "INSERT INTO repayment_expenses (repayment_id, expense_id) VALUES (?, ?)", (repayment_id, expense_id)
+                )
 
     def repayments(self, group_id: str) -> list[RepaymentRow]:
         with self.connection() as connection:
             rows = connection.execute(
-                "SELECT * FROM repayments WHERE group_id = ? ORDER BY created_at", (group_id,)
+                """
+                SELECT repayments.*, link.expense_id FROM repayments
+                LEFT JOIN repayment_expenses AS link ON link.repayment_id = repayments.id
+                WHERE repayments.group_id = ? ORDER BY repayments.created_at
+                """,
+                (group_id,),
             ).fetchall()
         return [RepaymentRow(**{key: row[key] for key in RepaymentRow.__dataclass_fields__}) for row in rows]
 
@@ -271,7 +291,10 @@ class GroupStore(Store):
             cursor = connection.execute(
                 "DELETE FROM repayments WHERE id = ? AND group_id = ?", (repayment_id, group_id)
             )
-            return cursor.rowcount > 0
+            if cursor.rowcount == 0:
+                return False
+            connection.execute("DELETE FROM repayment_expenses WHERE repayment_id = ?", (repayment_id,))
+            return True
 
     # --- Monthly bills (flatmates) ---
 
