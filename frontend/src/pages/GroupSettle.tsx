@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { addRepayment, setGroupUpiId } from '../api'
 import type { Debt, Group } from '../api'
 import { personColor } from '../colors'
-import { capitalise, findEntry, groupLink, nameOrYou, whoPaysWhom } from '../groups'
+import { findEntry, groupLink, whoPaysWhom } from '../groups'
 import type { GroupCtx } from '../groups'
 import { formatRupees } from '../money'
 import { UPI_ID, upiLink } from '../upi'
@@ -125,7 +125,7 @@ function DebtRow(
         <div className="px-4 pb-4">
           <ul className="border-t border-dashed border-steel-dark pt-2 text-sm">
             {debt.entries.map((entry) => (
-              <EntryLine key={entry.ref} group={group} you={you} debt={debt} entryRef={entry.ref} amount={entry.amount_paise} />
+              <EntryLine key={entry.ref} group={group} entryRef={entry.ref} amount={entry.amount_paise} />
             ))}
             <li className="mt-1 flex justify-between border-t border-steel pt-2 font-semibold">
               <span>{youOwe ? `You pay ${other}` : `${other} pays you`}</span>
@@ -172,32 +172,21 @@ function DebtRow(
   )
 }
 
-/** One reason behind a debt, e.g. "Dinner, Arun paid: your part +₹264.00". */
-function EntryLine(props: { group: Group; you: string; debt: Debt; entryRef: string; amount: number }) {
-  const { group, you, debt, amount } = props
-  const entry = findEntry(group, props.entryRef)
+/** One reason behind a debt: the expense's name and what it adds (+) or takes off (−). The row
+ * is already inside one person, so it doesn't repeat who paid. */
+function EntryLine(props: { group: Group; entryRef: string; amount: number }) {
+  const entry = findEntry(props.group, props.entryRef)
   if (!entry) return null
-  // A positive amount adds to what the sender owes: the receiver paid, it's the sender's part.
-  const [payer, partOf] = amount > 0 ? [debt.receiver, debt.sender] : [debt.sender, debt.receiver]
-  const label =
-    entry.type === 'expense' ? (
-      <>
-        <span className="font-semibold">{entry.title}</span>
-        <span className="text-muted">
-          , {payer === you ? 'you' : payer} paid, {partOf === you ? 'your' : `${partOf}’s`} part
-        </span>
-      </>
-    ) : (
-      <span className="text-muted">
-        {capitalise(nameOrYou(entry.sender, you))} paid {nameOrYou(entry.receiver, you)}
-      </span>
-    )
   return (
     <li className="flex justify-between gap-3 py-1">
-      <span className="min-w-0">{label}</span>
-      <span className={`amount shrink-0 ${amount < 0 ? 'text-muted' : ''}`}>
-        {amount < 0 ? '−' : '+'}
-        {formatRupees(Math.abs(amount))}
+      {entry.type === 'expense' ? (
+        <span className="min-w-0 font-semibold">{entry.title}</span>
+      ) : (
+        <span className="min-w-0 text-muted">Paid back</span>
+      )}
+      <span className={`amount shrink-0 ${props.amount < 0 ? 'text-muted' : ''}`}>
+        {props.amount < 0 ? '−' : '+'}
+        {formatRupees(Math.abs(props.amount))}
       </span>
     </li>
   )
