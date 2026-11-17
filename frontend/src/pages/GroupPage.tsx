@@ -108,6 +108,7 @@ export function GroupPage() {
           </Link>
         )
       }
+      headerRight={<AddPeopleButton {...ctx} />}
     >
       <p className="-mt-3 mb-4 text-sm text-muted">
         You’re {you}.{' '}
@@ -124,15 +125,7 @@ export function GroupPage() {
         </p>
       )}
 
-      <SettleTabs {...ctx} />
-      <Cost {...ctx} />
-      {group.kind === 'flat' && <DueBills {...ctx} />}
-      <Activity {...ctx} />
-      {group.debts.length > 0 && <ShareSummary group={group} />}
-      {group.kind === 'flat' && <MonthlyBills {...ctx} addLink={`${addLink}?monthly`} />}
-      {group.kind === 'flat' && <Months {...ctx} />}
-      <Leaderboard {...ctx} />
-      {group.kind === 'trip' && group.total_paise > 0 && <WrappedLink group={group} />}
+      <MainTabs {...ctx} addLink={addLink} />
       <Members {...ctx} />
       <Invite group={group} />
       {group.kind === 'trip' && group.is_owner && <TripControls {...ctx} />}
@@ -142,6 +135,108 @@ export function GroupPage() {
 }
 
 type Ctx = GroupCtx
+
+/** Everything else, in two top-level tabs: the money (settling up, cost, leaderboard) and the
+ * activity log, which can get long and used to push the settle-up boxes far down the page. */
+function MainTabs(props: Ctx & { addLink: string }) {
+  const { group } = props
+  const [tab, setTab] = useState<'settle' | 'activity'>('settle')
+
+  return (
+    <section>
+      <div role="tablist" aria-label="Group sections" className="mb-4 flex gap-2">
+        {(
+          [
+            { id: 'settle', label: 'Settle up' },
+            { id: 'activity', label: 'Activity' },
+          ] as const
+        ).map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === option.id}
+            onClick={() => setTab(option.id)}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              tab === option.id ? 'bg-ink text-paper' : 'bg-steel text-muted'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'settle' ? (
+        <div role="tabpanel">
+          <SettleTabs {...props} />
+          <Cost {...props} />
+          {group.kind === 'flat' && <DueBills {...props} />}
+          {group.debts.length > 0 && <ShareSummary group={group} />}
+          {group.kind === 'flat' && <MonthlyBills {...props} addLink={`${props.addLink}?monthly`} />}
+          {group.kind === 'flat' && <Months {...props} />}
+          <Leaderboard {...props} />
+          {group.kind === 'trip' && group.total_paise > 0 && <WrappedLink group={group} />}
+        </div>
+      ) : (
+        <div role="tabpanel">
+          <Activity {...props} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** A quick way to add a friend without scrolling down to "People in this group". */
+function AddPeopleButton({ group, busy, act }: Ctx) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setName('')
+    act(() => addMember(group.id, trimmed))
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label="Add people"
+        title="Add people"
+        className={`flex size-9 items-center justify-center rounded-full border-2 border-line ${open ? 'bg-accent' : 'bg-white'}`}
+      >
+        <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="9" cy="8" r="3" />
+          <path d="M3 19c0-3 2.7-5 6-5s6 2 6 5M17 8h4m-2-2v4" />
+        </svg>
+      </button>
+      {open && (
+        <form onSubmit={submit} className="tile pop-shadow absolute top-11 right-0 z-10 flex w-60 gap-1.5 bg-white p-2.5">
+          <input
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Friend's name"
+            maxLength={40}
+            aria-label="Add a friend by name"
+            className="min-w-0 flex-1 rounded-lg bg-steel px-2.5 py-1.5 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={busy || !name.trim()}
+            className="rounded-lg bg-brand px-3 font-display text-sm font-semibold text-white disabled:bg-muted/40"
+          >
+            Add
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
 
 /** What it's cost you so far. Opens to your part of each expense, e.g. "Petrol ₹2,000.00". */
 function Cost({ group, you }: Ctx) {

@@ -15,6 +15,7 @@ export function Screen(props: {
   step?: number // 1-4 while answering questions
   children: ReactNode
   action?: ReactNode
+  headerRight?: ReactNode // an extra control before the theme picker, e.g. "Add people"
 }) {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
@@ -22,7 +23,10 @@ export function Screen(props: {
         <Link to="/" aria-label="Split Rupya, start a new split">
           <Logo />
         </Link>
-        {props.step ? <Steps current={props.step} /> : <ThemePicker />}
+        <div className="flex items-center gap-1.5">
+          {props.step ? <Steps current={props.step} /> : <ThemePicker />}
+          {props.headerRight}
+        </div>
       </header>
       <main className="flex-1 px-4 pt-6 pb-48">
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
