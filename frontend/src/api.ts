@@ -266,6 +266,25 @@ const groupUrl = (id: string, rest = '') => `/api/groups/${id}${rest}`
 export const createGroup = (group: NewGroup) => request<Group>('/api/groups', json(group))
 export const getMyGroups = () => request<{ groups: GroupSummary[] }>('/api/groups')
 export const getGroup = (id: string) => request<Group>(groupUrl(id))
+/** A group's highlights for its shareable card. A highlight that would be a tie is null. */
+export type Wrapped = {
+  name: string
+  kind: GroupKind
+  people: number
+  start_date: string
+  end_date: string
+  days: number
+  total_paise: number
+  per_person_paise: number
+  per_day_paise: number
+  expenses: number
+  biggest: { title: string; total_paise: number }
+  banker: { person: string; paid_paise: number }
+  top_spender: { person: string; spent_paise: number } | null
+  busiest_day: { date: string; total_paise: number } | null
+  payments_left: number
+}
+export const getWrapped = (id: string) => request<Wrapped>(groupUrl(id, '/wrapped'))
 export const joinGroup = (id: string, member: string) => request<Group>(groupUrl(id, '/join'), json({ member }))
 export const addQuickExpense = (
   id: string,

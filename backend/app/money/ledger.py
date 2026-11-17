@@ -77,6 +77,15 @@ def spent_by_person(members: list[str], expenses: list[Expense]) -> dict[str, in
     return spent
 
 
+def paid_by_person(members: list[str], expenses: list[Expense]) -> dict[str, int]:
+    """What each member paid up front across all expenses, whoever it was for."""
+    paid = dict.fromkeys(members, 0)
+    for expense in expenses:
+        for person, amount in expense.paid.items():
+            paid[person] += amount
+    return paid
+
+
 def expense_debts(expense: Expense) -> dict[tuple[str, str], int]:
     """Who owes whom for one expense: (debtor, payer) -> paise.
 

@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 import { AddExpense } from './pages/AddExpense'
 import { GroupPage } from './pages/GroupPage'
 import { Home } from './pages/Home'
+import { WrappedPage } from './pages/Wrapped'
 import { InstantSplit } from './pages/InstantSplit'
 import { Privacy, Terms } from './pages/Legal'
 import { NewGroup } from './pages/NewGroup'
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/split/:id" element={<SplitPage />} />
         <Route path="/groups/new" element={<NewGroup />} />
         <Route path="/groups/:id" element={<GroupPage />} />
+        <Route path="/groups/:id/wrapped" element={<WrappedPage />} />
         <Route path="/groups/:id/add" element={<AddExpense />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />

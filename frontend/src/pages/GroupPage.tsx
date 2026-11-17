@@ -127,6 +127,7 @@ export function GroupPage() {
       {group.kind === 'flat' && <MonthlyBills {...ctx} addLink={`${addLink}?monthly`} />}
       {group.kind === 'flat' && <Months {...ctx} />}
       <Leaderboard {...ctx} />
+      {group.kind === 'trip' && group.total_paise > 0 && <WrappedLink group={group} />}
       <Invite group={group} />
       {group.kind === 'trip' && group.is_owner && <TripControls {...ctx} />}
       {error && <ErrorText>{error}</ErrorText>}
@@ -209,6 +210,26 @@ function Leaderboard({ group, you }: Ctx) {
         })}
       </ol>
     </Section>
+  )
+}
+
+/** Trips: the way in to the shareable picture of the trip's highlights. */
+function WrappedLink({ group }: { group: Group }) {
+  return (
+    <Link
+      to={`/groups/${group.id}/wrapped`}
+      className="mt-6 mr-1 flex items-center gap-4 rounded-[1.25rem] border-2 border-line bg-coal p-4 text-snow pop-shadow"
+    >
+      <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-saffron text-coal">
+        <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l2.2 5.6L20 9.3l-4.5 3.9L17 19l-5-3.1L7 19l1.5-5.8L4 9.3l5.8-.7Z" />
+        </svg>
+      </span>
+      <span>
+        <span className="block font-display text-lg font-bold">Trip Wrapped</span>
+        <span className="text-sm text-snow/75">{group.closed ? 'Your trip in one picture. Share it with the group.' : 'Your trip so far, in one picture.'}</span>
+      </span>
+    </Link>
   )
 }
 

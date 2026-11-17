@@ -36,6 +36,7 @@ from app.money.ledger import (
     Repayment,
     expense_debts,
     group_balances,
+    paid_by_person,
     pairwise_debts,
     share_amount,
     spent_by_person,
@@ -146,6 +147,12 @@ def my_groups(user: User = Depends(require_user), groups: GroupStore = Depends(g
 @router.get("/{group_id}")
 def get_group(group_id: str, user: User | None = Depends(current_user), groups: GroupStore = Depends(get_groups)) -> dict:
     return describe_group(groups, load(groups, group_id), user)
+
+
+@router.get("/{group_id}/wrapped")
+def get_wrapped(group_id: str, groups: GroupStore = Depends(get_groups)) -> dict:
+    """The group's highlights for its shareable "Wrapped" card."""
+    return describe_wrapped(groups, load(groups, group_id))
 
 
 @router.post("/{group_id}/join")
@@ -387,6 +394,64 @@ def expense_month(expense: ExpenseRow) -> str:
         return expense.month
     added = datetime.fromisoformat(expense.created_at.replace("Z", "+00:00")).astimezone(IST)
     return added.strftime("%Y-%m")
+
+
+def expense_day(expense: ExpenseRow) -> date:
+    """The day an expense was added, in Indian time."""
+    return datetime.fromisoformat(expense.created_at.replace("Z", "+00:00")).astimezone(IST).date()
+
+
+def describe_wrapped(groups: GroupStore, group: Group) -> dict:
+    """The highlights of a group's spending, for one shareable picture: the total, what it came
+    to per person and per day, the biggest expense, who fronted the most, and the busiest day.
+
+    Only facts that are true of the data are included: a highlight that would be a tie or
+    meaningless (the "top spender" when everyone's share is equal) is left out as None.
+    """
+    expenses = groups.expenses(group.id)
+    if not expenses:
+        raise reject("Nothing to wrap up yet. Add an expense first.")
+    ledger = to_ledger(expenses)
+    total = sum(sum(expense.paid.values()) for expense in expenses)
+
+    # How long it ran: the trip's own dates, otherwise from the first expense to the last.
+    spent_on = [expense_day(expense) for expense in expenses]
+    first = date.fromisoformat(group.start_date) if group.start_date else min(spent_on)
+    last = date.fromisoformat(group.end_date) if group.end_date else max(spent_on)
+    days = max((last - first).days + 1, 1)
+
+    biggest = max(expenses, key=lambda expense: sum(expense.paid.values()))
+    paid = paid_by_person(group.members, ledger)
+    banker = max(group.members, key=lambda person: paid[person])
+    spent = spent_by_person(group.members, ledger)
+    top_spender = max(group.members, key=lambda person: spent[person])
+    by_day: dict[date, int] = {}
+    for expense, day in zip(expenses, spent_on, strict=True):
+        by_day[day] = by_day.get(day, 0) + sum(expense.paid.values())
+    busiest = max(by_day, key=lambda day: by_day[day])
+    debts_left = len(pairwise_debts(ledger, to_repayments(groups.repayments(group.id))))
+
+    return {
+        "name": group.name,
+        "kind": group.kind,
+        "people": len(group.members),
+        "start_date": first.isoformat(),
+        "end_date": last.isoformat(),
+        "days": days,
+        "total_paise": total,
+        "per_person_paise": total // len(group.members),  # rounded down: shown as "about"
+        "per_day_paise": total // days,
+        "expenses": len(expenses),
+        "biggest": {"title": biggest.title, "total_paise": sum(biggest.paid.values())},
+        "banker": {"person": banker, "paid_paise": paid[banker]},
+        # Left out when everyone's share is the same: there is no top spender then.
+        "top_spender": (
+            {"person": top_spender, "spent_paise": spent[top_spender]} if len(set(spent.values())) > 1 else None
+        ),
+        # Left out when everything was on one day.
+        "busiest_day": {"date": busiest.isoformat(), "total_paise": by_day[busiest]} if len(by_day) > 1 else None,
+        "payments_left": debts_left,
+    }
 
 
 def describe_group(groups: GroupStore, group: Group, user: User | None) -> dict:

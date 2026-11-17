@@ -278,6 +278,49 @@ def test_a_trip_cant_end_before_it_starts(client):
     assert "can't end before it starts" in response.json()["detail"]
 
 
+# --- Wrapped ---
+
+
+def test_wrapped_sums_up_a_trip(client):
+    trip_id = new_group(client, kind="trip", start_date="2026-11-13", end_date="2026-11-15").json()["id"]
+    quick(client, trip_id, 600000, title="Petrol")
+    quick(client, trip_id, 90000, paid_by="Arun", weights={"Arun": 1, "Ravi": 2}, title="Stay")
+    quick(client, trip_id, 19800, paid_by="Ravi", title="Snacks")
+
+    wrapped = client.get(f"/api/groups/{trip_id}/wrapped").json()
+
+    assert (wrapped["name"], wrapped["people"], wrapped["days"], wrapped["expenses"]) == ("Lunch gang", 3, 3, 3)
+    assert wrapped["total_paise"] == 709800
+    assert (wrapped["per_person_paise"], wrapped["per_day_paise"]) == (236600, 236600)
+    assert wrapped["biggest"] == {"title": "Petrol", "total_paise": 600000}
+    assert wrapped["banker"] == {"person": "Priya", "paid_paise": 600000}
+    # Ravi: 2,000 petrol + 600 stay + 66 snacks.
+    assert wrapped["top_spender"] == {"person": "Ravi", "spent_paise": 266600}
+    assert wrapped["busiest_day"] is None  # all added today
+    assert wrapped["payments_left"] == 3
+
+
+def test_wrapped_leaves_out_ties_and_counts_what_is_settled(client):
+    group_id = new_group(client).json()["id"]
+    quick(client, group_id, 90000)
+
+    wrapped = client.get(f"/api/groups/{group_id}/wrapped").json()
+    assert wrapped["top_spender"] is None and wrapped["days"] == 1 and wrapped["payments_left"] == 2
+
+    for sender in ("Arun", "Ravi"):
+        body = {"sender": sender, "receiver": "Priya", "amount_paise": 30000, "by": sender}
+        client.post(f"/api/groups/{group_id}/repayments", json=body)
+    assert client.get(f"/api/groups/{group_id}/wrapped").json()["payments_left"] == 0
+
+
+def test_wrapped_needs_an_expense(client):
+    group_id = new_group(client).json()["id"]
+
+    response = client.get(f"/api/groups/{group_id}/wrapped")
+
+    assert response.status_code == 422 and "Nothing to wrap up yet" in response.json()["detail"]
+
+
 # --- Flatmates ---
 
 
