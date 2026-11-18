@@ -1,0 +1,5 @@
+Type a note. Split Rupya reads the bill and figures out who had what — so you don't have to.
+
+"Ravi doesn't drink, Meena left before dessert" — that's the whole input. The agent reads the receipt and the note together and splits every item correctly, shares that always add up to the paisa.
+
+No tapping through every item. Snap the bill, type a sentence, settle up in one tap.

@@ -16,6 +16,9 @@ __pycache__/
 
 # Receipt photos and splits saved by the app
 uploads/
+
+# brag-slim build intermediates (frames, raw audio, silent video) — keep only the deliverables
+brag-output/work/
 *.db
 *.db-shm
 *.db-wal
